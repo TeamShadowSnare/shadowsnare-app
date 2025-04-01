@@ -16,7 +16,6 @@ from csv_uploader_ui import CSVUploaderUI
 
 
 model_path = os.path.join(os.getcwd(), "binary_classification_model.keras")
-
 try:
     model = load_model(model_path)
 except Exception as e:
@@ -93,24 +92,19 @@ class CSVUploaderApp(CSVUploaderUI):
                 """
 
                 self.data_display_ref.setText(f"{result_message}{datetime_str}")
-
                 self.tab_widget_ref.setVisible(True)
                 self.update_plots()
 
             except Exception as e:
                 self.data_display_ref.setText(f"Error processing CSV file: {e}")
-                print("ERROR IS: ", e)
         elif model is None:
             self.data_display_ref.setText("Error: Model not loaded. Please ensure 'binary_classification_model.keras' is in the correct location.")
 
     def update_plots(self):
         self.confusion_graphics_scene_ref.clear()
-        self.graph_graphics_scene_ref.clear()
         self.data_text_edit_ref.setText("\n\n".join([f"Process {i+1}:\n" + ", ".join(row) for i, row in enumerate(self.dataFromINDEX2Col)]))
-
         self.update_confusion_plot()
-        self.update_graph_plot()
-
+        self.update_misclassified_processes()
 
     def update_confusion_plot(self):
         if self.predictions is not None:
@@ -124,38 +118,43 @@ class CSVUploaderApp(CSVUploaderUI):
         self.confusion_graphics_view_ref.update()
         self.confusion_graphics_view_ref.viewport().update()
 
-    def update_graph_plot(self):
-        if self.predictions is not None:
-            pixmap = self.generate_graph_plot()
-            self.update_graph_plot_in_ui(pixmap)
+    def update_misclassified_processes(self):
+        """ Updates the misclassified processes tab with the formatted data. """
+        if self.predictions is not None and self.data is not None:
+            true_labels = np.array([str(label).strip() for label in self.data[:, 0]])
+            label_mapping = {"Benign": 0, "Malware": 1}
 
-    def update_graph_plot_in_ui(self, pixmap):
-        self.graph_graphics_scene_ref.clear()
-        self.graph_graphics_scene_ref.addPixmap(pixmap)
-        self.graph_graphics_view_ref.setSceneRect(QRectF(pixmap.rect()))
-        self.graph_graphics_view_ref.update()
-        self.graph_graphics_view_ref.viewport().update()
+            y_test = np.array([label_mapping[label] for label in true_labels if label in label_mapping])
+            y_pred = (self.predictions > 0.5).astype(int).flatten()
 
+            misclassified_indices = np.where(y_test != y_pred)[0]
 
+            if len(misclassified_indices) == 0:
+                self.misclassified_text_edit_ref.setText("✅ No misclassified processes found.")
+                return
 
+            misclassified_text = ""
+            for idx in misclassified_indices:
+                process_number = idx + 1
+                true_label = "Malware" if y_test[idx] == 1 else "Benign"
+                pred_label = "Malware" if y_pred[idx] == 1 else "Benign"
+                misclassified_text += f"Process {process_number}:\n"
+                misclassified_text += f"  True Label: {true_label}, Predicted: {pred_label}\n"
+
+            self.misclassified_text_edit_ref.setText(misclassified_text)
+            self.tab_widget_ref.setVisible(True)
 
     def generate_confusion_matrix_plot(self):
         if self.predictions is not None and self.data is not None:
             true_labels = np.array([str(label).strip() for label in self.data[:, 0]])
- 
             label_mapping = {"Benign": 0, "Malware": 1}
-            
-            # Filter out unknown labels to avoid errors
             y_test = np.array([label_mapping[label] for label in true_labels if label in label_mapping])
-
             y_pred = (self.predictions > 0.5).astype(int)
 
             if len(y_test) != len(y_pred):
                 raise ValueError(f"Mismatch in label lengths: y_test={len(y_test)}, y_pred={len(y_pred)}")
-
             cm = confusion_matrix(y_test, y_pred, labels=[0, 1])
-            display_labels = ["Benign", "Malicious"]
-            # Display confusion matrix
+            display_labels = ["Benign", "Malware"]
             plt.figure(figsize=(9, 5))
             disp = ConfusionMatrixDisplay(confusion_matrix=cm, display_labels=display_labels)
             disp.plot(cmap=plt.cm.Reds, ax=plt.gca())
@@ -168,26 +167,6 @@ class CSVUploaderApp(CSVUploaderUI):
             buf.seek(0)
             image = QImage.fromData(buf.getvalue())
             return QPixmap.fromImage(image)
-
-
-
-
-
-    def generate_graph_plot(self):
-        if self.predictions is not None:
-            plt.figure(figsize=(9, 5))
-            sns.histplot(self.predictions, bins=20, color='#e74c3c', kde=True)
-            plt.title("Prediction Distribution", fontsize=16)
-            plt.xlabel("Prediction Probability", fontsize=14)
-            plt.ylabel("Frequency", fontsize=14)
-            buf = io.BytesIO()
-            plt.savefig(buf, format='png')
-            plt.close()
-            buf.seek(0)
-            image = QImage.fromData(buf.getvalue())
-            return QPixmap.fromImage(image)
-        return QPixmap() # Return an empty QPixmap if predictions are None
-
 
 if __name__ == '__main__':
     app = QApplication(sys.argv)
