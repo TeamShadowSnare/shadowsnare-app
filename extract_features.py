@@ -1,401 +1,363 @@
 #!/usr/bin/env python3
-import os
 import subprocess
-import json
-import statistics
 import re
-import pandas as pd
+import os
 import csv
-from collections import defaultdict, Counter
+import argparse
+from collections import defaultdict
 
-# Configuration
-MEMORY_DUMP = "C:/winpmem/memory_dmp.raw"
-VOLATILITY3 = "c:/volatility3/vol.py"
-OUTPUT_FILE = "memory_features.csv"
-
-def run_volatility(plugin, args=None):
-    """Run a volatility plugin and return the JSON output."""
-    # Use --output-format=json instead of -o json
-    cmd = ["python", VOLATILITY3, "-f", MEMORY_DUMP, "--output-format=json", plugin]
-    if args:
-        cmd.extend(args)
+def run_volatility_command(memory_image, plugin, additional_args=None):
+    """Run a Volatility 3 command and return the output."""
+    cmd = ['python3', 'vol.py', '-f', memory_image, plugin]
+    if additional_args:
+        cmd.extend(additional_args)
     
     print(f"Running: {' '.join(cmd)}")
-    try:
-        result = subprocess.run(cmd, capture_output=True, text=True, check=True)
-        return json.loads(result.stdout)
-    except subprocess.CalledProcessError as e:
-        print(f"Error running {plugin}: {e}")
-        print(f"Stderr: {e.stderr}")
-        return None
-    except json.JSONDecodeError:
-        print(f"Error decoding JSON output from {plugin}")
-        print(f"Raw output: {result.stdout[:500]}...")  # Print first 500 chars of output
-        return None
+    result = subprocess.run(cmd, capture_output=True, text=True)
+    if result.returncode != 0:
+        print(f"Error running {plugin}: {result.stderr}")
+        return ""
+    return result.stdout
 
-def extract_pslist_features():
+def extract_pslist_features(memory_image):
     """Extract features from the pslist plugin."""
-    data = run_volatility("windows.pslist")
-    if not data:
-        return {}
+    output = run_volatility_command(memory_image, 'windows.pslist')
     
-    processes = data.get("rows", [])
+    processes = []
+    for line in output.split('\n'):
+        if 'PID' in line and 'PPID' in line:  # Header line
+            continue
+        if not line.strip():
+            continue
+        
+        parts = line.split()
+        if len(parts) >= 4:  # Ensure we have enough parts
+            try:
+                pid = int(parts[1])
+                ppid = int(parts[2])
+                threads = int(parts[3])
+                processes.append({
+                    'pid': pid,
+                    'ppid': ppid,
+                    'threads': threads,
+                    'is_64bit': '64bit' in line.lower()
+                })
+            except (ValueError, IndexError):
+                continue
     
-    # Count total processes
-    nproc = len(processes)
-    
-    # Count parent processes (unique PPIDs)
-    ppids = set(proc[3] for proc in processes)
-    nppid = len(ppids)
-    
-    # Calculate average threads per process
-    threads = [int(proc[4]) for proc in processes]
-    avg_threads = statistics.mean(threads) if threads else 0
-    
-    # Count 64-bit processes
-    bit64_count = sum(1 for proc in processes if "64bit" in proc[7])
-    nprocs64bit = bit64_count
-    
-    # Calculate average handle count if available
-    handles = [int(proc[5]) for proc in processes if proc[5] is not None and proc[5] != ""]
-    avg_handlers = statistics.mean(handles) if handles else 0
-    
-    return {
-        "pslist.nproc": nproc,
-        "pslist.nppid": nppid,
-        "pslist.avg_threads": avg_threads,
-        "pslist.nprocs64bit": nprocs64bit,
-        "pslist.avg_handlers": avg_handlers
+    features = {
+        'pslist.nproc': len(processes),
+        'pslist.nppid': len(set(p['ppid'] for p in processes)),
+        'pslist.avg_threads': sum(p['threads'] for p in processes) / len(processes) if processes else 0,
+        'pslist.nprocs64bit': sum(1 for p in processes if p['is_64bit']),
     }
+    
+    # Getting handler count requires windows.handles plugin
+    handlers_output = run_volatility_command(memory_image, 'windows.handles')
+    handlers_by_pid = defaultdict(int)
+    
+    for line in handlers_output.split('\n'):
+        if 'PID' in line and 'Handle' in line:  # Header line
+            continue
+        if not line.strip():
+            continue
+        
+        parts = line.split()
+        if len(parts) >= 2:
+            try:
+                pid = int(parts[1])
+                handlers_by_pid[pid] += 1
+            except (ValueError, IndexError):
+                continue
+    
+    if handlers_by_pid:
+        features['pslist.avg_handlers'] = sum(handlers_by_pid.values()) / len(handlers_by_pid)
+    else:
+        features['pslist.avg_handlers'] = 0
+    
+    return features
 
-def extract_dlllist_features():
+def extract_dlllist_features(memory_image):
     """Extract features from the dlllist plugin."""
-    data = run_volatility("windows.dlllist")
-    if not data:
-        return {}
+    output = run_volatility_command(memory_image, 'windows.dlllist')
     
-    rows = data.get("rows", [])
+    dlls_by_pid = defaultdict(int)
+    total_dlls = 0
     
-    # Group DLLs by process
-    dlls_by_proc = defaultdict(list)
-    for row in rows:
-        proc_id = row[1]  # Process ID column
-        if len(row) > 3 and row[3]:  # Check if DLL path exists
-            dlls_by_proc[proc_id].append(row[3])
+    for line in output.split('\n'):
+        if 'PID' in line and 'Process' in line:  # Header line
+            continue
+        if not line.strip():
+            continue
+        
+        # Look for DLL lines
+        if 'DLL' in line and 'Base' in line:
+            continue
+        
+        # First line of each process block contains the PID
+        if 'PID' in line:
+            current_pid = int(re.search(r'PID\s+(\d+)', line).group(1))
+            continue
+            
+        # Count DLLs for the current process
+        if line.strip() and 'Command line' not in line:
+            dlls_by_pid[current_pid] += 1
+            total_dlls += 1
     
-    # Count unique DLLs
-    all_dlls = [dll for proc_dlls in dlls_by_proc.values() for dll in proc_dlls]
-    ndlls = len(set(all_dlls))
-    
-    # Calculate average DLLs per process
-    dll_counts = [len(dlls) for dlls in dlls_by_proc.values()]
-    avg_dlls_per_proc = statistics.mean(dll_counts) if dll_counts else 0
-    
-    return {
-        "dlllist.ndlls": ndlls,
-        "dlllist.avg_dlls_per_proc": avg_dlls_per_proc
+    features = {
+        'dlllist.ndlls': total_dlls,
+        'dlllist.avg_dlls_per_proc': total_dlls / len(dlls_by_pid) if dlls_by_pid else 0
     }
+    
+    return features
 
-def extract_handles_features():
+def extract_handles_features(memory_image):
     """Extract features from the handles plugin."""
-    data = run_volatility("windows.handles")
-    if not data:
-        return {}
+    output = run_volatility_command(memory_image, 'windows.handles')
     
-    rows = data.get("rows", [])
-    
-    # Count total handles
-    nhandles = len(rows)
-    
-    # Group handles by process
-    handles_by_proc = defaultdict(list)
+    handles_by_pid = defaultdict(int)
     handle_types = defaultdict(int)
     
-    for row in rows:
-        proc_id = row[1]  # Process ID column
-        handle_type = row[3].lower() if row[3] else "unknown"
-        handles_by_proc[proc_id].append(handle_type)
-        handle_types[handle_type] += 1
+    for line in output.split('\n'):
+        if 'PID' in line and 'Handle' in line:  # Header line
+            continue
+        if not line.strip():
+            continue
+        
+        parts = line.split()
+        if len(parts) >= 4:  # Ensure we have enough parts
+            try:
+                pid = int(parts[1])
+                handle_type = parts[3].lower()
+                
+                handles_by_pid[pid] += 1
+                handle_types[handle_type] += 1
+            except (ValueError, IndexError):
+                continue
     
-    # Calculate average handles per process
-    handle_counts = [len(handles) for handles in handles_by_proc.values()]
-    avg_handles_per_proc = statistics.mean(handle_counts) if handle_counts else 0
+    total_handles = sum(handles_by_pid.values())
     
-    # Count handles by type
-    nport = handle_types.get("port", 0)
-    nfile = handle_types.get("file", 0)
-    nevent = handle_types.get("event", 0)
-    ndesktop = handle_types.get("desktop", 0)
-    nkey = handle_types.get("key", 0)
-    nthread = handle_types.get("thread", 0)
-    ndirectory = handle_types.get("directory", 0)
-    nsemaphore = handle_types.get("semaphore", 0)
-    ntimer = handle_types.get("timer", 0)
-    nsection = handle_types.get("section", 0)
-    nmutant = handle_types.get("mutant", 0)
-    
-    return {
-        "handles.nhandles": nhandles,
-        "handles.avg_handles_per_proc": avg_handles_per_proc,
-        "handles.nport": nport,
-        "handles.nfile": nfile,
-        "handles.nevent": nevent,
-        "handles.ndesktop": ndesktop,
-        "handles.nkey": nkey,
-        "handles.nthread": nthread,
-        "handles.ndirectory": ndirectory,
-        "handles.nsemaphore": nsemaphore,
-        "handles.ntimer": ntimer,
-        "handles.nsection": nsection,
-        "handles.nmutant": nmutant
+    features = {
+        'handles.nhandles': total_handles,
+        'handles.avg_handles_per_proc': total_handles / len(handles_by_pid) if handles_by_pid else 0,
+        'handles.nport': handle_types.get('port', 0),
+        'handles.nfile': handle_types.get('file', 0),
+        'handles.nevent': handle_types.get('event', 0),
+        'handles.ndesktop': handle_types.get('desktop', 0),
+        'handles.nkey': handle_types.get('key', 0),
+        'handles.nthread': handle_types.get('thread', 0),
+        'handles.ndirectory': handle_types.get('directory', 0),
+        'handles.nsemaphore': handle_types.get('semaphore', 0),
+        'handles.ntimer': handle_types.get('timer', 0),
+        'handles.nsection': handle_types.get('section', 0),
+        'handles.nmutant': handle_types.get('mutant', 0)
     }
+    
+    return features
 
-def extract_ldrmodules_features():
+def extract_ldrmodules_features(memory_image):
     """Extract features from the ldrmodules plugin."""
-    data = run_volatility("windows.ldrmodules")
-    if not data:
-        return {}
+    # Assuming windows.ldrmodules is the correct plugin name in Volatility 3
+    output = run_volatility_command(memory_image, 'windows.ldrmodules')
     
-    rows = data.get("rows", [])
-    
-    # Group modules by process
-    modules_by_proc = defaultdict(list)
     not_in_load = 0
     not_in_init = 0
     not_in_mem = 0
+    processes = set()
     
-    for row in rows:
-        proc_id = row[1]  # Process ID column
-        in_load = row[4]
-        in_init = row[5]
-        in_mem = row[6]
+    for line in output.split('\n'):
+        if 'PID' in line and 'Process' in line:  # Header line
+            continue
+        if not line.strip():
+            continue
         
-        module_info = {
-            "in_load": in_load.lower() == "true" if isinstance(in_load, str) else bool(in_load),
-            "in_init": in_init.lower() == "true" if isinstance(in_init, str) else bool(in_init),
-            "in_mem": in_mem.lower() == "true" if isinstance(in_mem, str) else bool(in_mem)
-        }
-        
-        modules_by_proc[proc_id].append(module_info)
-        
-        if not module_info["in_load"]:
-            not_in_load += 1
-        if not module_info["in_init"]:
-            not_in_init += 1
-        if not module_info["in_mem"]:
-            not_in_mem += 1
-    
-    # Calculate averages per process
-    process_counts = []
-    for proc_id, modules in modules_by_proc.items():
-        if modules:
-            proc_not_in_load = sum(1 for m in modules if not m["in_load"])
-            proc_not_in_init = sum(1 for m in modules if not m["in_init"])
-            proc_not_in_mem = sum(1 for m in modules if not m["in_mem"])
-            
-            process_counts.append({
-                "not_in_load": proc_not_in_load / len(modules),
-                "not_in_init": proc_not_in_init / len(modules),
-                "not_in_mem": proc_not_in_mem / len(modules)
-            })
-    
-    not_in_load_avg = statistics.mean([p["not_in_load"] for p in process_counts]) if process_counts else 0
-    not_in_init_avg = statistics.mean([p["not_in_init"] for p in process_counts]) if process_counts else 0
-    not_in_mem_avg = statistics.mean([p["not_in_mem"] for p in process_counts]) if process_counts else 0
-    
-    return {
-        "ldrmodules.not_in_load": not_in_load,
-        "ldrmodules.not_in_init": not_in_init,
-        "ldrmodules.not_in_mem": not_in_mem,
-        "ldrmodules.not_in_load_avg": not_in_load_avg,
-        "ldrmodules.not_in_init_avg": not_in_init_avg,
-        "ldrmodules.not_in_mem_avg": not_in_mem_avg
-    }
-
-def extract_malfind_features():
-    """Extract features from the malfind plugin."""
-    data = run_volatility("windows.malfind")
-    if not data:
-        return {}
-
-    rows = data.get("rows", [])
-    
-    # Count total injections
-    ninjections = len(rows)
-    
-    # Process protection and commit charge information
-    commit_charges = []
-    protections = Counter()
-    unique_injections = set()
-    
-    for row in rows:
-        if len(row) > 4:
-            protection = row[4] if row[4] else "Unknown"
-            protections[protection] += 1
-            
-            # Add to unique injections set (combination of process, address, and protection)
-            if len(row) > 3:
-                unique_key = f"{row[1]}_{row[3]}_{protection}"
-                unique_injections.add(unique_key)
-        
-        if len(row) > 5 and row[5]:
+        parts = line.split()
+        if len(parts) >= 7:  # Ensure we have enough parts
             try:
-                commit_charge = int(row[5])
-                commit_charges.append(commit_charge)
-            except (ValueError, TypeError):
-                pass
+                pid = int(parts[1])
+                processes.add(pid)
+                
+                # Check load, init, and mem flags
+                load_flag = parts[4].lower()
+                init_flag = parts[5].lower()
+                mem_flag = parts[6].lower()
+                
+                if load_flag == 'false':
+                    not_in_load += 1
+                if init_flag == 'false':
+                    not_in_init += 1
+                if mem_flag == 'false':
+                    not_in_mem += 1
+            except (ValueError, IndexError):
+                continue
     
-    # Calculate average commit charge
-    avg_commit_charge = statistics.mean(commit_charges) if commit_charges else 0
-    
-    # Most common protection
-    most_common_protection = protections.most_common(1)[0][0] if protections else "None"
-    
-    return {
-        "malfind.ninjections": ninjections,
-        "malfind.commitCharge": avg_commit_charge,
-        "malfind.protection": most_common_protection,
-        "malfind.uniqueInjections": len(unique_injections)
+    features = {
+        'ldrmodules.not_in_load': not_in_load,
+        'ldrmodules.not_in_init': not_in_init,
+        'ldrmodules.not_in_mem': not_in_mem,
+        'ldrmodules.not_in_load_avg': not_in_load / len(processes) if processes else 0,
+        'ldrmodules.not_in_init_avg': not_in_init / len(processes) if processes else 0,
+        'ldrmodules.not_in_mem_avg': not_in_mem / len(processes) if processes else 0
     }
+    
+    return features
 
-def extract_psxview_features():
+def extract_malfind_features(memory_image):
+    """Extract features from the malfind plugin."""
+    output = run_volatility_command(memory_image, 'windows.malfind')
+    
+    injections = []
+    commit_charge_total = 0
+    protection_types = defaultdict(int)
+    
+    current_pid = None
+    current_address = None
+    
+    for line in output.split('\n'):
+        if not line.strip():
+            continue
+        
+        # Process line with PID
+        pid_match = re.search(r'Process\s+(\w+)\s+PID\s+(\d+)', line)
+        if pid_match:
+            current_pid = int(pid_match.group(2))
+            continue
+            
+        # VadTag line contains address
+        vad_match = re.search(r'VadTag:\s+(\w+)\s+at\s+(0x[0-9a-fA-F]+)', line)
+        if vad_match:
+            current_address = vad_match.group(2)
+            continue
+            
+        # Commit charge line
+        commit_match = re.search(r'CommitCharge:\s+(\d+)', line)
+        if commit_match and current_pid and current_address:
+            commit_charge = int(commit_match.group(1))
+            commit_charge_total += commit_charge
+            continue
+            
+        # Protection line
+        protection_match = re.search(r'Protection:\s+(\w+)', line)
+        if protection_match and current_pid and current_address:
+            protection = protection_match.group(1)
+            protection_types[protection] += 1
+            
+            # Record the injection
+            injections.append((current_pid, current_address, protection))
+            continue
+    
+    # Count unique injections (by address)
+    unique_injections = len(set(addr for _, addr, _ in injections))
+    
+    features = {
+        'malfind.ninjections': len(injections),
+        'malfind.commitCharge': commit_charge_total,
+        'malfind.protection': len(protection_types),
+        'malfind.uniqueInjections': unique_injections
+    }
+    
+    return features
+
+def extract_psxview_features(memory_image):
     """Extract features from the psxview plugin."""
-    # Note: In Vol3, psxview is known as psscan and pstree
-    # We'll need to combine data from multiple plugins
+    # Note: psxview in Volatility 3 might be different or not available
+    # This will need to be adapted based on the actual Volatility 3 equivalent
+    output = run_volatility_command(memory_image, 'windows.psxview')
     
-    # Get data from pslist (our baseline)
-    pslist_data = run_volatility("windows.pslist")
-    psscan_data = run_volatility("windows.psscan")
-    sessions_data = run_volatility("windows.sessions")
-    handles_data = run_volatility("windows.handles")
-    
-    if not pslist_data or not psscan_data:
-        return {}
-    
-    # Extract PIDs from each source
-    pslist_pids = set(row[1] for row in pslist_data.get("rows", []))
-    psscan_pids = set(row[1] for row in psscan_data.get("rows", []))
-    
-    # Extract session information
-    session_pids = set()
-    for row in sessions_data.get("rows", []) if sessions_data else []:
-        if len(row) > 1:
-            session_pids.add(row[1])
-    
-    # Extract CSRSS handles information (processes referenced by csrss)
-    csrss_pids = set()
-    csrss_processes = [row[1] for row in pslist_data.get("rows", []) if "csrss.exe" in row[2].lower()]
-    
-    for row in handles_data.get("rows", []) if handles_data else []:
-        if row[1] in csrss_processes and row[3].lower() == "process":
-            # Try to extract PID from the process object details
-            pid_match = re.search(r"PID (\d+)", row[5] if len(row) > 5 else "")
-            if pid_match:
-                csrss_pids.add(int(pid_match.group(1)))
-    
-    # For eprocess_pool, ethread_pool, pspcid_list, deskthrd we'll estimate with what we have
-    # These require more direct memory access than Vol3 API provides
-    
-    # Calculate metrics
-    all_pids = pslist_pids.union(psscan_pids).union(session_pids).union(csrss_pids)
-    process_status = {}
-    
-    for pid in all_pids:
-        process_status[pid] = {
-            "in_pslist": pid in pslist_pids,
-            "in_psscan": pid in psscan_pids,  # Approximation for eprocess_pool
-            "in_ethread_pool": True,  # Cannot reliably determine, assume true
-            "in_pspcid_list": True,  # Cannot reliably determine, assume true
-            "in_csrss_handles": pid in csrss_pids,
-            "in_session": pid in session_pids,
-            "in_deskthrd": True  # Cannot reliably determine, assume true
+    # If the plugin doesn't exist or works differently
+    if "No plugin named 'windows.psxview'" in output or not output:
+        print("Warning: psxview plugin not found or not working in Volatility 3")
+        return {
+            'psxview.not_in_pslist': 0,
+            'psxview.not_in_eprocess_pool': 0,
+            'psxview.not_in_ethread_pool': 0,
+            'psxview.not_in_pspcid_list': 0,
+            'psxview.not_in_csrss_handles': 0,
+            'psxview.not_in_session': 0,
+            'psxview.not_in_deskthrd': 0,
+            'psxview.not_in_pslist_false_avg': 0,
+            'psxview.not_in_eprocess_pool_false_avg': 0,
+            'psxview.not_in_ethread_pool_false_avg': 0,
+            'psxview.not_in_pspcid_list_false_avg': 0,
+            'psxview.not_in_csrss_handles_false_avg': 0,
+            'psxview.not_in_session_false_avg': 0,
+            'psxview.not_in_deskthrd_false_avg': 0
         }
     
-    # Count processes not in each list
-    not_in_pslist = sum(1 for status in process_status.values() if not status["in_pslist"])
-    not_in_eprocess_pool = sum(1 for status in process_status.values() if not status["in_psscan"])
-    not_in_ethread_pool = sum(1 for status in process_status.values() if not status["in_ethread_pool"])
-    not_in_pspcid_list = sum(1 for status in process_status.values() if not status["in_pspcid_list"])
-    not_in_csrss_handles = sum(1 for status in process_status.values() if not status["in_csrss_handles"])
-    not_in_session = sum(1 for status in process_status.values() if not status["in_session"])
-    not_in_deskthrd = sum(1 for status in process_status.values() if not status["in_deskthrd"])
+    # Process the output if the plugin exists
+    not_in_counts = defaultdict(int)
+    total_processes = 0
     
-    # Calculate false positives per process (hidden processes)
-    hidden_proc_values = []
-    for pid, status in process_status.items():
-        if not status["in_pslist"]:
-            hidden_proc_values.append({
-                "not_in_pslist": 1 if not status["in_pslist"] else 0,
-                "not_in_eprocess_pool": 1 if not status["in_psscan"] else 0,
-                "not_in_ethread_pool": 1 if not status["in_ethread_pool"] else 0,
-                "not_in_pspcid_list": 1 if not status["in_pspcid_list"] else 0,
-                "not_in_csrss_handles": 1 if not status["in_csrss_handles"] else 0,
-                "not_in_session": 1 if not status["in_session"] else 0,
-                "not_in_deskthrd": 1 if not status["in_deskthrd"] else 0
-            })
+    for line in output.split('\n'):
+        if 'PID' in line and 'pslist' in line:  # Header line
+            continue
+        if not line.strip():
+            continue
+        
+        parts = line.split()
+        if len(parts) >= 8:  # Ensure we have enough parts
+            try:
+                total_processes += 1
+                
+                # Check each visibility method
+                if parts[2].lower() == 'false':
+                    not_in_counts['pslist'] += 1
+                if parts[3].lower() == 'false':
+                    not_in_counts['eprocess_pool'] += 1
+                if parts[4].lower() == 'false':
+                    not_in_counts['ethread_pool'] += 1
+                if parts[5].lower() == 'false':
+                    not_in_counts['pspcid_list'] += 1
+                if parts[6].lower() == 'false':
+                    not_in_counts['csrss_handles'] += 1
+                if parts[7].lower() == 'false':
+                    not_in_counts['session'] += 1
+                if len(parts) >= 9 and parts[8].lower() == 'false':
+                    not_in_counts['deskthrd'] += 1
+            except (ValueError, IndexError):
+                continue
     
-    # Calculate averages for hidden processes
-    if hidden_proc_values:
-        not_in_pslist_false_avg = statistics.mean([p["not_in_pslist"] for p in hidden_proc_values])
-        not_in_eprocess_pool_false_avg = statistics.mean([p["not_in_eprocess_pool"] for p in hidden_proc_values])
-        not_in_ethread_pool_false_avg = statistics.mean([p["not_in_ethread_pool"] for p in hidden_proc_values])
-        not_in_pspcid_list_false_avg = statistics.mean([p["not_in_pspcid_list"] for p in hidden_proc_values])
-        not_in_csrss_handles_false_avg = statistics.mean([p["not_in_csrss_handles"] for p in hidden_proc_values])
-        not_in_session_false_avg = statistics.mean([p["not_in_session"] for p in hidden_proc_values])
-        not_in_deskthrd_false_avg = statistics.mean([p["not_in_deskthrd"] for p in hidden_proc_values])
-    else:
-        not_in_pslist_false_avg = 0
-        not_in_eprocess_pool_false_avg = 0
-        not_in_ethread_pool_false_avg = 0
-        not_in_pspcid_list_false_avg = 0
-        not_in_csrss_handles_false_avg = 0
-        not_in_session_false_avg = 0
-        not_in_deskthrd_false_avg = 0
-    
-    return {
-        "psxview.not_in_pslist": not_in_pslist,
-        "psxview.not_in_eprocess_pool": not_in_eprocess_pool,
-        "psxview.not_in_ethread_pool": not_in_ethread_pool,
-        "psxview.not_in_pspcid_list": not_in_pspcid_list,
-        "psxview.not_in_csrss_handles": not_in_csrss_handles,
-        "psxview.not_in_session": not_in_session,
-        "psxview.not_in_deskthrd": not_in_deskthrd,
-        "psxview.not_in_pslist_false_avg": not_in_pslist_false_avg,
-        "psxview.not_in_eprocess_pool_false_avg": not_in_eprocess_pool_false_avg,
-        "psxview.not_in_ethread_pool_false_avg": not_in_ethread_pool_false_avg,
-        "psxview.not_in_pspcid_list_false_avg": not_in_pspcid_list_false_avg,
-        "psxview.not_in_csrss_handles_false_avg": not_in_csrss_handles_false_avg,
-        "psxview.not_in_session_false_avg": not_in_session_false_avg,
-        "psxview.not_in_deskthrd_false_avg": not_in_deskthrd_false_avg
+    features = {
+        'psxview.not_in_pslist': not_in_counts['pslist'],
+        'psxview.not_in_eprocess_pool': not_in_counts['eprocess_pool'],
+        'psxview.not_in_ethread_pool': not_in_counts['ethread_pool'],
+        'psxview.not_in_pspcid_list': not_in_counts['pspcid_list'],
+        'psxview.not_in_csrss_handles': not_in_counts['csrss_handles'],
+        'psxview.not_in_session': not_in_counts['session'],
+        'psxview.not_in_deskthrd': not_in_counts['deskthrd'],
+        'psxview.not_in_pslist_false_avg': not_in_counts['pslist'] / total_processes if total_processes else 0,
+        'psxview.not_in_eprocess_pool_false_avg': not_in_counts['eprocess_pool'] / total_processes if total_processes else 0,
+        'psxview.not_in_ethread_pool_false_avg': not_in_counts['ethread_pool'] / total_processes if total_processes else 0,
+        'psxview.not_in_pspcid_list_false_avg': not_in_counts['pspcid_list'] / total_processes if total_processes else 0,
+        'psxview.not_in_csrss_handles_false_avg': not_in_counts['csrss_handles'] / total_processes if total_processes else 0,
+        'psxview.not_in_session_false_avg': not_in_counts['session'] / total_processes if total_processes else 0,
+        'psxview.not_in_deskthrd_false_avg': not_in_counts['deskthrd'] / total_processes if total_processes else 0
     }
+    
+    return features
 
-def extract_modules_features():
+def extract_modules_features(memory_image):
     """Extract features from the modules plugin."""
-    data = run_volatility("windows.modules")
-    if not data:
-        return {}
+    output = run_volatility_command(memory_image, 'windows.modules')
     
-    rows = data.get("rows", [])
+    module_count = 0
+    for line in output.split('\n'):
+        if 'Base' in line and 'Size' in line:  # Header line
+            continue
+        if line.strip():
+            module_count += 1
     
-    # Count total modules
-    nmodules = len(rows)
-    
-    return {
-        "modules.nmodules": nmodules
+    features = {
+        'modules.nmodules': module_count
     }
+    
+    return features
 
-def extract_svcscan_features():
+def extract_svcscan_features(memory_image):
     """Extract features from the svcscan plugin."""
-    data = run_volatility("windows.svcscan")
-    if not data:
-        return {}
+    output = run_volatility_command(memory_image, 'windows.svcscan')
     
-    rows = data.get("rows", [])
-    
-    # Count total services
-    nservices = len(rows)
-    
-    # Count by service type
+    services = []
     kernel_drivers = 0
     fs_drivers = 0
     process_services = 0
@@ -403,110 +365,143 @@ def extract_svcscan_features():
     interactive_process_services = 0
     active_services = 0
     
-    for row in rows:
-        service_type = row[3].lower() if len(row) > 3 and row[3] else ""
-        service_state = row[4].lower() if len(row) > 4 and row[4] else ""
-        
-        if "kernel" in service_type:
-            kernel_drivers += 1
-        if "file system" in service_type:
-            fs_drivers += 1
-        if "own process" in service_type:
-            process_services += 1
-        if "share process" in service_type:
-            shared_process_services += 1
-        if "interactive" in service_type:
-            interactive_process_services += 1
-        
-        if "running" in service_state:
-            active_services += 1
+    current_service = {}
     
-    return {
-        "svcscan.nservices": nservices,
-        "svcscan.kernel_drivers": kernel_drivers,
-        "svcscan.fs_drivers": fs_drivers,
-        "svcscan.process_services": process_services,
-        "svcscan.shared_process_services": shared_process_services,
-        "svcscan.interactive_process_services": interactive_process_services,
-        "svcscan.nactive": active_services
+    for line in output.split('\n'):
+        if not line.strip():
+            if current_service:
+                services.append(current_service)
+                current_service = {}
+            continue
+        
+        # Service Record line indicates the start of a new service
+        if 'Service Record' in line:
+            if current_service:
+                services.append(current_service)
+            current_service = {}
+            continue
+        
+        # Parse service type
+        type_match = re.search(r'Type\s*:\s*(\w+)', line)
+        if type_match and current_service is not None:
+            service_type = type_match.group(1).lower()
+            current_service['type'] = service_type
+            
+            if 'kernel' in service_type and 'driver' in service_type:
+                kernel_drivers += 1
+            elif 'fs' in service_type and 'driver' in service_type:
+                fs_drivers += 1
+            elif 'process' in service_type:
+                process_services += 1
+            elif 'shared' in service_type and 'process' in service_type:
+                shared_process_services += 1
+            elif 'interactive' in service_type:
+                interactive_process_services += 1
+            continue
+        
+        # Parse service state
+        state_match = re.search(r'State\s*:\s*(\w+)', line)
+        if state_match and current_service is not None:
+            service_state = state_match.group(1).lower()
+            current_service['state'] = service_state
+            
+            if 'active' in service_state or 'running' in service_state:
+                active_services += 1
+            continue
+    
+    # Add the last service if any
+    if current_service:
+        services.append(current_service)
+    
+    features = {
+        'svcscan.nservices': len(services),
+        'svcscan.kernel_drivers': kernel_drivers,
+        'svcscan.fs_drivers': fs_drivers,
+        'svcscan.process_services': process_services,
+        'svcscan.shared_process_services': shared_process_services,
+        'svcscan.interactive_process_services': interactive_process_services,
+        'svcscan.nactive': active_services
     }
+    
+    return features
 
-def extract_callbacks_features():
+def extract_callbacks_features(memory_image):
     """Extract features from the callbacks plugin."""
-    data = run_volatility("windows.callbacks")
-    if not data:
-        return {}
+    output = run_volatility_command(memory_image, 'windows.callbacks')
     
-    rows = data.get("rows", [])
+    callbacks_count = 0
+    anonymous_count = 0
+    generic_count = 0
     
-    # Count total callbacks
-    ncallbacks = len(rows)
-    
-    # Count by type
-    nanonymous = 0
-    ngeneric = 0
-    
-    for row in rows:
-        callback_type = row[1].lower() if len(row) > 1 and row[1] else ""
-        module = row[2].lower() if len(row) > 2 and row[2] else ""
+    for line in output.split('\n'):
+        if 'Type' in line and 'Callback' in line:  # Header line
+            continue
+        if not line.strip():
+            continue
         
-        if not module or module == "unknown":
-            nanonymous += 1
-        if "generic" in callback_type:
-            ngeneric += 1
+        callbacks_count += 1
+        
+        if 'ANONYMOUS' in line:
+            anonymous_count += 1
+        if 'GENERIC' in line:
+            generic_count += 1
     
-    return {
-        "callbacks.ncallbacks": ncallbacks,
-        "callbacks.nanonymous": nanonymous,
-        "callbacks.ngeneric": ngeneric
+    features = {
+        'callbacks.ncallbacks': callbacks_count,
+        'callbacks.nanonymous': anonymous_count,
+        'callbacks.ngeneric': generic_count
     }
+    
+    return features
 
 def main():
-    """Main function to extract all features and write to CSV."""
-    # Extract all features
-    features = {}
+    parser = argparse.ArgumentParser(description='Extract memory forensics features using Volatility 3')
+    parser.add_argument('-f', '--file', required=True, help='Memory image file')
+    parser.add_argument('-o', '--output', default='memory_features.csv', help='Output CSV file')
+    args = parser.parse_args()
     
-    print("Extracting pslist features...")
-    features.update(extract_pslist_features())
+    # Check if the memory image exists
+    if not os.path.isfile(args.file):
+        print(f"Error: Memory image file '{args.file}' not found")
+        return
     
-    print("Extracting dlllist features...")
-    features.update(extract_dlllist_features())
+    # Extract features from different plugins
+    all_features = {}
     
-    print("Extracting handles features...")
-    features.update(extract_handles_features())
+    # Extract features from each plugin
+    extractors = [
+        extract_pslist_features,
+        extract_dlllist_features,
+        extract_handles_features,
+        extract_ldrmodules_features,
+        extract_malfind_features,
+        extract_psxview_features,
+        extract_modules_features,
+        extract_svcscan_features,
+        extract_callbacks_features
+    ]
     
-    print("Extracting ldrmodules features...")
-    features.update(extract_ldrmodules_features())
+    for extractor in extractors:
+        try:
+            features = extractor(args.file)
+            all_features.update(features)
+            print(f"Extracted {len(features)} features from {extractor.__name__}")
+        except Exception as e:
+            print(f"Error in {extractor.__name__}: {str(e)}")
     
-    print("Extracting malfind features...")
-    features.update(extract_malfind_features())
-    
-    print("Extracting psxview features...")
-    features.update(extract_psxview_features())
-    
-    print("Extracting modules features...")
-    features.update(extract_modules_features())
-    
-    print("Extracting svcscan features...")
-    features.update(extract_svcscan_features())
-    
-    print("Extracting callbacks features...")
-    features.update(extract_callbacks_features())
-    
-    # Write features to CSV
-    with open(OUTPUT_FILE, 'w', newline='') as csvfile:
-        fieldnames = sorted(features.keys())
-        writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
-        
-        writer.writeheader()
-        writer.writerow(features)
-    
-    print(f"Features extracted successfully to {OUTPUT_FILE}")
-    
-    # Display summary of extracted features
-    print("\nExtracted Features Summary:")
-    for feature, value in sorted(features.items()):
+    # Print the extracted features
+    print("\nExtracted Features:")
+    for feature, value in sorted(all_features.items()):
         print(f"{feature}: {value}")
+    
+    # Save to CSV
+    with open(args.output, 'w', newline='') as f:
+        writer = csv.writer(f)
+        writer.writerow(['Feature', 'Value'])
+        for feature, value in sorted(all_features.items()):
+            writer.writerow([feature, value])
+    
+    print(f"\nFeatures saved to {args.output}")
 
 if __name__ == "__main__":
     main()
