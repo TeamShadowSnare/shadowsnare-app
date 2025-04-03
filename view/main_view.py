@@ -6,11 +6,10 @@ from PyQt6.QtCore import Qt, QRectF
 
 class CSVUploaderUI(QMainWindow):
     def __init__(self):
-        """Initializes the main window and sets up the UI."""
         super().__init__()
         self.setWindowTitle("Malware Process Detection")
         self.setGeometry(100, 100, 1200, 900)
-        self.load_stylesheet("style.qss")
+        self.load_stylesheet("view/style.qss")
 
         self.central_widget = QWidget()
         self.setCentralWidget(self.central_widget)
@@ -55,26 +54,20 @@ class CSVUploaderUI(QMainWindow):
         self.tab_widget.addTab(self.data_tab, "Data")
         self.tab_widget.addTab(self.misclassified_tab, "Misclassified Processes")
 
-        # Confusion Matrix Tab Layout
         self.confusion_layout = QVBoxLayout(self.confusion_tab)
         self.confusion_graphics_view = QGraphicsView()
         self.confusion_graphics_scene = QGraphicsScene()
         self.confusion_graphics_view.setScene(self.confusion_graphics_scene)
-        self.confusion_graphics_view.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
         self.confusion_layout.addWidget(self.confusion_graphics_view)
 
-        # Data Tab Layout
         self.data_layout = QVBoxLayout(self.data_tab)
         self.data_text_edit = QTextEdit()
         self.data_text_edit.setReadOnly(True)
-        self.data_text_edit.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
         self.data_layout.addWidget(self.data_text_edit)
 
-        # Misclassified Processes Tab Layout
         self.misclassified_layout = QVBoxLayout(self.misclassified_tab)
         self.misclassified_text_edit = QTextEdit()
         self.misclassified_text_edit.setReadOnly(True)
-        self.misclassified_text_edit.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
         self.misclassified_layout.addWidget(self.misclassified_text_edit)
 
         self.tab_widget.setVisible(False)
@@ -92,7 +85,6 @@ class CSVUploaderUI(QMainWindow):
         self.right_layout.addWidget(self.data_display)
         self.data_display.setText("No file uploaded")
 
-        # Store references to UI elements
         self.process_button_ref = self.process_button
         self.tab_widget_ref = self.tab_widget
         self.data_display_ref = self.data_display
@@ -101,25 +93,20 @@ class CSVUploaderUI(QMainWindow):
         self.data_text_edit_ref = self.data_text_edit
         self.misclassified_text_edit_ref = self.misclassified_text_edit
 
-        self.original_geometry = self.geometry()
-
     def setup_connections(self, controller):
-        """Sets up signal and slot connections for UI elements."""
         self.upload_button.clicked.connect(controller.upload_csv)
         self.process_button.clicked.connect(controller.process_csv)
 
     def update_confusion_plot(self, pixmap):
-        """Clears and updates the confusion matrix display."""
         self.confusion_graphics_scene_ref.clear()
         self.confusion_graphics_scene_ref.addPixmap(pixmap)
         self.confusion_graphics_view_ref.setSceneRect(QRectF(pixmap.rect()))
         self.confusion_graphics_view_ref.update()
         self.confusion_graphics_view_ref.viewport().update()
 
-    def load_stylesheet(self, file_name):
-        """Loads and applies a stylesheet from a file."""
+    def load_stylesheet(self, file_path):
         try:
-            with open(file_name, "r") as file:
+            with open(file_path, "r") as file:
                 stylesheet = file.read()
                 self.setStyleSheet(stylesheet)
         except Exception as e:
