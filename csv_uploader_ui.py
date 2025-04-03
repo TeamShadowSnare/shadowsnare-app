@@ -26,7 +26,7 @@ class CSVUploaderUI(QMainWindow):
         self.left_widget.setLayout(self.left_layout)
         self.splitter.addWidget(self.left_widget)
 
-        self.label = QLabel("Malware Detecting Process")
+        self.label = QLabel("Malware Process Detection")
         self.left_layout.addWidget(self.label, alignment=Qt.AlignmentFlag.AlignCenter)
 
         self.upload_process_layout = QHBoxLayout()
