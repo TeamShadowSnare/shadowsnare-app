@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+#!/usr/bin/env python
 import subprocess
 import re
 import os
@@ -6,14 +6,19 @@ import csv
 import argparse
 from collections import defaultdict
 
-def run_volatility_command(memory_image, plugin, additional_args=None):
+def run_volatility_command(memory_image, plugin, debug=True):
     """Run a Volatility 3 command and return the output."""
-    cmd = ['python3', 'vol.py', '-f', memory_image, plugin]
-    if additional_args:
-        cmd.extend(additional_args)
+    cmd = ['python', 'vol.py', '-f', memory_image, plugin]
     
     print(f"Running: {' '.join(cmd)}")
-    result = subprocess.run(cmd, capture_output=True, text=True)
+    
+    # Set environment variable for UTF-8 encoding
+    my_env = os.environ.copy()
+    my_env["PYTHONIOENCODING"] = "utf-8"
+    
+    result = subprocess.run(cmd, capture_output=True, text=True, env=my_env)
+    
+    # Rest of the function...
     if result.returncode != 0:
         print(f"Error running {plugin}: {result.stderr}")
         return ""
