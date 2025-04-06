@@ -1,21 +1,15 @@
 from PyQt6.QtWidgets import (
-    QMainWindow, QWidget, QVBoxLayout, QPushButton, QLabel, QTextEdit, QHBoxLayout,
+    QWidget, QVBoxLayout, QPushButton, QLabel, QTextEdit, QHBoxLayout,
     QSpacerItem, QSizePolicy, QTabWidget, QGraphicsView, QGraphicsScene, QSplitter
 )
 from PyQt6.QtCore import Qt, QRectF
 
-class CSVUploaderUI(QMainWindow):
+class CSVUploaderView(QWidget):
     def __init__(self):
         super().__init__()
-        self.setWindowTitle("Malware Process Detection")
-        self.setGeometry(100, 100, 1200, 900)
-        self.load_stylesheet("view/style.qss")
-
-        self.central_widget = QWidget()
-        self.setCentralWidget(self.central_widget)
 
         self.main_layout = QVBoxLayout()
-        self.central_widget.setLayout(self.main_layout)
+        self.setLayout(self.main_layout)
 
         self.splitter = QSplitter(Qt.Orientation.Horizontal)
         self.main_layout.addWidget(self.splitter)
@@ -103,11 +97,3 @@ class CSVUploaderUI(QMainWindow):
         self.confusion_graphics_view_ref.setSceneRect(QRectF(pixmap.rect()))
         self.confusion_graphics_view_ref.update()
         self.confusion_graphics_view_ref.viewport().update()
-
-    def load_stylesheet(self, file_path):
-        try:
-            with open(file_path, "r") as file:
-                stylesheet = file.read()
-                self.setStyleSheet(stylesheet)
-        except Exception as e:
-            print(f"Error loading stylesheet: {e}")
