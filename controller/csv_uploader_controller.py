@@ -3,6 +3,7 @@ from PyQt6.QtWidgets import QFileDialog
 from PyQt6.QtCore import QDate, QTime, Qt
 from model.malware_model import MalwareDetector
 from utils.plot_utils import generate_confusion_matrix_pixmap
+from utils.plot_utils import generate_shap_explanation
 
 class CSVUploaderController:
     def __init__(self, view):
@@ -18,6 +19,11 @@ class CSVUploaderController:
         self.file_path, _ = QFileDialog.getOpenFileName(self.view, "Open CSV File", "", "CSV Files (*.csv)")
         if self.file_path:
             try:
+                with open(self.file_path, 'r') as f:
+                    header_line = f.readline().strip()
+                    all_columns = header_line.split(',')  
+                    self.feature_names = all_columns[2:] 
+
                 self.data = np.genfromtxt(self.file_path, delimiter=',', dtype=str, skip_header=1)
                 if self.data.ndim == 1:
                     self.data = self.data.reshape(1, -1)
@@ -63,6 +69,43 @@ class CSVUploaderController:
 
                 self.view.data_display_ref.setText(f"{result_message}{datetime_str}")
                 self.view.tab_widget_ref.setVisible(True)
+                # 👉 SHAP explanation for the first sample
+                try:
+                    # Step 1: Prepare the raw data
+                    raw_X = self.dataFromINDEX2Col.astype(float)
+
+                    # Step 2: Scale it once
+                    X_scaled = self.model.scaler.transform(raw_X)
+
+                    # Step 3: Predict with X_scaled (not inside the model!)
+                    probabilities = self.model.model.predict(X_scaled)
+                    binary_preds = (probabilities > 0.5).astype(int).flatten()
+
+                    # Step 4: Now you're safe — everything lines up
+                    malicious_indices = np.where(binary_preds == 1)[0]
+
+                    # Step 5: SHAP explanations
+                    for idx in malicious_indices:
+                        print(f"Explaining Process {idx+1}")
+                        print("Raw values for process:", raw_X[idx])
+                        sample = X_scaled[idx]
+
+                        shap_pixmap, shap_text = generate_shap_explanation(
+                            self.model.model,
+                            X_scaled,
+                            sample,
+                            self.feature_names
+                        )
+                        print("SHAP sample values:", sample)
+                        print("Expected raw values:", raw_X[idx])
+                        self.view.append_shap_explanation(idx + 1, shap_pixmap, shap_text)
+                        
+
+                    # self.view.update_shap_explanation(shap_pixmap, shap_text)
+
+                except Exception as e:
+                    print(f"⚠️ Error generating SHAP explanation: {e}")
+
                 self.update_plots()
 
             except Exception as e:
