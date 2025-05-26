@@ -5,7 +5,6 @@ import matplotlib.pyplot as plt
 import io
 import shap
 
-# Only initialize once globally
 _shap_explainer = None
 
 def generate_confusion_matrix_pixmap(predictions, data):
@@ -38,17 +37,6 @@ def generate_shap_explanation(model, X_train, sample, feature_names):
     sample = sample.reshape(1, -1)
     shap_values = _shap_explainer(sample)
 
-    # Waterfall image
-    plt.figure()
-    shap.plots.waterfall(shap_values[0], show=False)
-    buf = io.BytesIO()
-    plt.savefig(buf, format="png", bbox_inches="tight")
-    plt.close()
-    buf.seek(0)
-    image = QImage.fromData(buf.getvalue())
-    pixmap = QPixmap.fromImage(image)
-
-    # Explanation text
     values = shap_values[0].values
     effects = sorted(zip(values, feature_names), key=lambda x: abs(x[0]), reverse=True)
     arrows = ["🟥 ↑" if val > 0 else "🟦 ↓" for val, _ in effects[:3]]
@@ -59,4 +47,9 @@ def generate_shap_explanation(model, X_train, sample, feature_names):
         f"Top factors:\n{explanation}\n\nFinal risk score: {final_score:.2f}"
     )
 
-    return pixmap, summary
+    return summary
+
+def load_template(template_path):
+    with open(template_path, 'r', encoding='utf-8') as f:
+        return f.read()
+

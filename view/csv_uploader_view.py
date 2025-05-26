@@ -81,9 +81,7 @@ class CSVUploaderView(QWidget):
         self.right_layout.addWidget(self.data_display)
         self.data_display.setText("No file uploaded")
 
-  # 👉 SHAP Explanation section
         self.explanation_layout = QVBoxLayout(self.explanation_tab)
-
         self.explanation_text = QTextEdit()
         self.explanation_text.setReadOnly(True)
         self.explanation_layout.addWidget(self.explanation_text)
@@ -116,11 +114,9 @@ class CSVUploaderView(QWidget):
         self.explanation_text.setPlainText(explanation)
 
 
-    def append_shap_explanation(self, process_number, pixmap, explanation):
+    def append_shap_explanation(self, process_number, explanation):
         header = f"🔍 Process {process_number} - Explanation:\n"
         separator = "-" * 60 + "\n"
-
-        # Append explanation text
         existing_text = self.explanation_text.toPlainText()
         new_text = f"{existing_text}\n{header}{explanation}\n{separator}"
         self.explanation_text.setPlainText(new_text)
