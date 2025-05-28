@@ -6,17 +6,6 @@ import subprocess
 import tempfile
 import os
 import pandas as pd
-import time
-
-def timed(func):
-    def wrapper(*args, **kwargs):
-        start = time.time()
-        result = func(*args, **kwargs)
-        elapsed = time.time() - start
-        print(f"[TIMER] {func.__name__} took {elapsed:.2f} seconds")
-        return result
-    return wrapper
-
 
 
 # Extractor functions extracts features from the Volatility
@@ -39,31 +28,70 @@ def extract_winInfo_features(jsondump):
         'info.npro': c,
         'info.IsPAE': d
     }
-
 def extract_pslist_features(jsondump):
     df = pd.read_json(jsondump)
+    features = {}
+
     try:
-        a = df.PPID.size                                           #Number of Processes
-        b = df.PPID.nunique()                                  #Number of Parent Processes
-        c = df.Threads.mean()                  #Average Thread count
-        d = df.Handles.mean()                 #Average Handler count
-        e = len(df[df["Wow64"]=="True"])                     #Number of 64-Bit Processes
-        f = df.PPID.size - len(df[df["File output"]=="Disabled"]) #Number of processes with FileOutput enabled 
-    except:
-        a = None
-        b = None
-        c = None
-        d = None
-        e = None
-        f = None
-    return{
-        'pslist.nproc': a,
-        'pslist.nppid': b,
-        'pslist.avg_threads': c,
-        'pslist.avg_handlers': d,
-        'pslist.nprocs64bit': e,
-        'pslist.outfile': f
-    }
+        print("nproc = ",df.PPID.size)
+        features['pslist.nproc'] = df.PPID.size
+    except Exception as e:
+        print(f"[WARN] pslist.nproc: {e}")
+
+    try:
+        features['pslist.nppid'] = df.PPID.nunique()
+    except Exception as e:
+        print(f"[WARN] pslist.nppid: {e}")
+
+    try:
+        features['pslist.avg_threads'] = df.Threads.mean()
+    except Exception as e:
+        print(f"[WARN] pslist.avg_threads: {e}")
+
+    # try:
+    #     print("DFBUGGING: Printing df.Handles...")
+    #     print(df.Handles)
+    #     features['pslist.avg_handlers'] = df.Handles.mean()
+    # except Exception as e:
+    #     print(f"[WARN] pslist.avg_handlers: {e}")
+
+    try:
+        features['pslist.nprocs64bit'] = len(df[df["Wow64"] == "True"])
+    except Exception as e:
+        print(f"[WARN] pslist.nprocs64bit: {e}")
+
+    # Optional: Commented because not in your dataset
+    # try:
+    #     features['pslist.outfile'] = df.PPID.size - len(df[df["File output"] == "Disabled"])
+    # except Exception as e:
+    #     print(f"[WARN] pslist.outfile: {e}")
+
+    return features
+
+# def extract_pslist_features(jsondump):
+#     df = pd.read_json(jsondump)
+#     try:
+#         a = df.PPID.size                                           #Number of Processes
+#         b = df.PPID.nunique()                                  #Number of Parent Processes
+#         c = df.Threads.mean()                  #Average Thread count
+#         d = df.Handles.mean()                 #Average Handler count
+#         e = len(df[df["Wow64"]=="True"])                     #Number of 64-Bit Processes
+#         f = df.PPID.size - len(df[df["File output"]=="Disabled"]) #Number of processes with FileOutput enabled 
+#     except:
+#         a = None
+#         b = None
+#         c = None
+#         d = None
+#         e = None
+#         f = None
+#     return{
+#         'pslist.nproc': a,
+#         'pslist.nppid': b,
+#         'pslist.avg_threads': c,
+#         'pslist.avg_handlers': d,
+#         'pslist.nprocs64bit': e,
+#         # 'pslist.outfile': f#Not part of our dataset
+#     }
 
 def extract_dlllist_features(jsondump):
     df = pd.read_json(jsondump)
@@ -81,110 +109,259 @@ def extract_dlllist_features(jsondump):
         e = None
     return{
         'dlllist.ndlls': a,
-        'dlllist.nproc_dll': b,
+        # 'dlllist.nproc_dll': b,#Not part of our dataset
         'dlllist.avg_dllPerProc': c,
-        'dlllist.avgSize': d,
-        'dlllist.outfile': e
+        # 'dlllist.avgSize': d,#Not part of our dataset
+        # 'dlllist.outfile': e#Not part of our dataset
     }
 
-def extract_handles_features(jsondump):
-    df = pd.read_json(jsondump)
-    try:
-        a = df.HandleValue.size                                #Total number of opened Handles
-        b = df.HandleValue.unique().size                #Total number of distinct Handle Values
-        c = df.PID.unique().size                                  #Number of processes with handles
-        d = df.GrantedAccess.unique().size                      #Number of distinct GrantedAccess
-        e = df.HandleValue.size/df.PID.unique().size#Average number of handles per process
-        f = len(df[df["Type"]=="Port"])                       #Number of Type of Handles --> Ports
-        g = len(df[df["Type"]=="Process"])                    #Number of Type of Handles --> Process
-        h = len(df[df["Type"]=="Thread"])                   #Number of Type of Handles --> Thread
-        i = len(df[df["Type"]=="Key"])                         #Number of Type of Handles --> Key
-        j = len(df[df["Type"]=="Event"])                     #Number of Type of Handles --> Event
-        k = len(df[df["Type"]=="File"])                      #Number of Type of Handles --> File
-        l = len(df[df["Type"]=="Directory"])                   #Number of Type of Handles --> Directory
-        m = len(df[df["Type"]=="Section"])                     #Number of Type of Handles --> Section
-        n = len(df[df["Type"]=="Desktop"])                    #Number of Type of Handles --> Desktop
-        o = len(df[df["Type"]=="Token"])                     #Number of Type of Handles --> Token
-        p = len(df[df["Type"]=="Mutant"])                   #Number of Type of Handles --> Mutant
-        q = len(df[df["Type"]=="KeyedEvent"])             #Number of Type of Handles --> KeyedEvent
-        r = len(df[df["Type"]=="SymbolicLink"])           #Number of Type of Handles --> SymbolicLink
-        s = len(df[df["Type"]=="Semaphore"])                #Number of Type of Handles --> Semaphore
-        t = len(df[df["Type"]=="WindowStation"])            #Number of Type of Handles --> WindowStation
-        u = len(df[df["Type"]=="Timer"])                     #Number of Type of Handles --> Timer
-        v = len(df[df["Type"]=="IoCompletion"])                 #Number of Type of Handles --> IoCompletion
-        w = len(df[df["Type"]=="WmiGuid"])                     #Number of Type of Handles --> WmiGuid
-        x = len(df[df["Type"]=="WaitablePort"])           #Number of Type of Handles --> WaitablePort
-        y = len(df[df["Type"]=="Job"])                         #Number of Type of Handles --> Job
-        z = df.HandleValue.size - len(df[df["Type"]=="Port"]) - len(df[df["Type"]=="Process"]) - len(df[df["Type"]=="Thread"]) - len(df[df["Type"]=="Key"])  \
-                                                    - len(df[df["Type"]=="Event"]) - len(df[df["Type"]=="File"]) - len(df[df["Type"]=="Directory"]) - len(df[df["Type"]=="Section"])\
-                                                    - len(df[df["Type"]=="Desktop"]) - len(df[df["Type"]=="Token"]) - len(df[df["Type"]=="Mutant"]) - len(df[df["Type"]=="KeyedEvent"])\
-                                                    - len(df[df["Type"]=="Semaphore"]) - len(df[df["Type"]=="WindowStation"]) - len(df[df["Type"]=="Timer"]) - len(df[df["Type"]=="IoCompletion"])\
-                                                    - len(df[df["Type"]=="WaitablePort"]) - len(df[df["Type"]=="Job"]) - len(df[df["Type"]=="SymbolicLink"]) - len(df[df["Type"]=="WmiGuid"])
-    except:
-        a = None
-        b = None
-        c = None
-        d = None
-        e = None
-        f = None        
-        g = None
-        h = None
-        i = None
-        j = None
-        k = None
-        l = None
-        m = None
-        n = None
-        o = None
-        p = None
-        q = None
-        r = None
-        s = None
-        t = None
-        u = None
-        v = None
-        w = None
-        x = None
-        y = None
-        z = None
+# def extract_handles_features(jsondump):
+#     df = pd.read_json(jsondump)
+#     try:
+#         a = df.HandleValue.size                                #Total number of opened Handles
+#         b = df.HandleValue.unique().size                #Total number of distinct Handle Values
+#         c = df.PID.unique().size                                  #Number of processes with handles
+#         d = df.GrantedAccess.unique().size                      #Number of distinct GrantedAccess
+#         e = df.HandleValue.size/df.PID.unique().size#Average number of handles per process
+#         f = len(df[df["Type"]=="Port"])                       #Number of Type of Handles --> Ports
+#         g = len(df[df["Type"]=="Process"])                    #Number of Type of Handles --> Process
+#         h = len(df[df["Type"]=="Thread"])                   #Number of Type of Handles --> Thread
+#         i = len(df[df["Type"]=="Key"])                         #Number of Type of Handles --> Key
+#         j = len(df[df["Type"]=="Event"])                     #Number of Type of Handles --> Event
+#         k = len(df[df["Type"]=="File"])                      #Number of Type of Handles --> File
+#         l = len(df[df["Type"]=="Directory"])                   #Number of Type of Handles --> Directory
+#         m = len(df[df["Type"]=="Section"])                     #Number of Type of Handles --> Section
+#         n = len(df[df["Type"]=="Desktop"])                    #Number of Type of Handles --> Desktop
+#         o = len(df[df["Type"]=="Token"])                     #Number of Type of Handles --> Token
+#         p = len(df[df["Type"]=="Mutant"])                   #Number of Type of Handles --> Mutant
+#         q = len(df[df["Type"]=="KeyedEvent"])             #Number of Type of Handles --> KeyedEvent
+#         r = len(df[df["Type"]=="SymbolicLink"])           #Number of Type of Handles --> SymbolicLink
+#         s = len(df[df["Type"]=="Semaphore"])                #Number of Type of Handles --> Semaphore
+#         t = len(df[df["Type"]=="WindowStation"])            #Number of Type of Handles --> WindowStation
+#         u = len(df[df["Type"]=="Timer"])                     #Number of Type of Handles --> Timer
+#         v = len(df[df["Type"]=="IoCompletion"])                 #Number of Type of Handles --> IoCompletion
+#         w = len(df[df["Type"]=="WmiGuid"])                     #Number of Type of Handles --> WmiGuid
+#         x = len(df[df["Type"]=="WaitablePort"])           #Number of Type of Handles --> WaitablePort
+#         y = len(df[df["Type"]=="Job"])                         #Number of Type of Handles --> Job
+#         z = df.HandleValue.size - len(df[df["Type"]=="Port"]) - len(df[df["Type"]=="Process"]) - len(df[df["Type"]=="Thread"]) - len(df[df["Type"]=="Key"])  \
+#                                                     - len(df[df["Type"]=="Event"]) - len(df[df["Type"]=="File"]) - len(df[df["Type"]=="Directory"]) - len(df[df["Type"]=="Section"])\
+#                                                     - len(df[df["Type"]=="Desktop"]) - len(df[df["Type"]=="Token"]) - len(df[df["Type"]=="Mutant"]) - len(df[df["Type"]=="KeyedEvent"])\
+#                                                     - len(df[df["Type"]=="Semaphore"]) - len(df[df["Type"]=="WindowStation"]) - len(df[df["Type"]=="Timer"]) - len(df[df["Type"]=="IoCompletion"])\
+#                                                     - len(df[df["Type"]=="WaitablePort"]) - len(df[df["Type"]=="Job"]) - len(df[df["Type"]=="SymbolicLink"]) - len(df[df["Type"]=="WmiGuid"])
+#     except:
+#         a = None
+#         b = None
+#         c = None
+#         d = None
+#         e = None
+#         f = None        
+#         g = None
+#         h = None
+#         i = None
+#         j = None
+#         k = None
+#         l = None
+#         m = None
+#         n = None
+#         o = None
+#         p = None
+#         q = None
+#         r = None
+#         s = None
+#         t = None
+#         u = None
+#         v = None
+#         w = None
+#         x = None
+#         y = None
+        # z = None
                                                                                 #Number of Type of Handles --> Unknown 
-    return{
-        'handles.nHandles': a,
-        'handles.distinctHandles': b,
-        'handles.nproc': c,
-        'handles.nAccess': d,
-        'handles.avgHandles_per_proc': e,
-        'handles.nTypePort': f,
-        'handles.nTyepProc': g,
-        'handles.nTypeThread': h,
-        'handles.nTypeKey': i,
-        'handles.nTypeEvent': j,
-        'handles.nTypeFile': k,
-        'handles.nTypeDir': l,
-        'handles.nTypeSec': m,
-        'handles.nTypeDesk': n,
-        'handles.nTypeToken': o,
-        'handles.nTypeMutant': p,
-        'handles.nTypeKeyEvent': q,
-        'handles.nTypeSymLink': r,
-        'handles.nTypeSemaph': s,
-        'handles.nTypeWinSta': t,
-        'handles.nTypeTimer': u,
-        'handles.nTypeIO': v,
-        'handles.nTypeWmi': w,
-        'handles.nTypeWaitPort': x,
-        'handles.nTypeJob': y,
-        'handles.nTypeUnknown': z  
-    }
+    # return{
+    #     'handles.nHandles': a,
+    #     'handles.distinctHandles': b,#Not part of our dataset
+    #     'handles.nproc': c,#Not part of our dataset
+    #     'handles.nAccess': d,
+
+    #     'handles.avgHandles_per_proc': e,
+    #     'handles.nTypePort': f,
+    #     'handles.nTyepProc': g,
+    #     'handles.nTypeThread': h,
+    #     'handles.nTypeKey': i,
+    #     'handles.nTypeEvent': j,
+    #     'handles.nTypeFile': k,
+    #     'handles.nTypeDir': l,
+    #     'handles.nTypeSec': m,
+    #     'handles.nTypeDesk': n,
+    #     'handles.nTypeToken': o,
+    #     'handles.nTypeMutant': p,
+    #     'handles.nTypeKeyEvent': q,
+    #     'handles.nTypeSymLink': r,
+    #     'handles.nTypeSemaph': s,
+    #     'handles.nTypeWinSta': t,
+    #     'handles.nTypeTimer': u,
+    #     'handles.nTypeIO': v,
+    #     'handles.nTypeWmi': w,
+    #     'handles.nTypeWaitPort': x,
+    #     'handles.nTypeJob': y,
+    #     'handles.nTypeUnknown': z  
+    # }
+    # handles = df
+    # return {
+    #     # Total # of opened handles
+    #     'handles.nhandles': len(handles),
+    #     # Avg. handle count per process
+    #     'handles.avg_handles_per_proc': len(handles) / len(set(h['Pid'] for h in handles)),
+    #     # TODO: Per-type counts?
+	# # # of handles of type port
+	# 'handles.nport': sum(1 if t['Type'] == 'Port' else 0 for t in handles),
+	# # # of handles of type file
+	# 'handles.nfile': sum(1 if t['Type'] == 'File' else 0 for t in handles),
+	# # # of handles of type event
+	# 'handles.nevent': sum(1 if t['Type'] == 'Event' else 0 for t in handles),
+	# # # of handles of type desktop
+	# 'handles.ndesktop': sum(1 if t['Type'] == 'Desktop' else 0 for t in handles),
+	# # # of handles of type key
+	# 'handles.nkey': sum(1 if t['Type'] == 'Key' else 0 for t in handles),
+	# # # of handles of type thread
+	# 'handles.nthread': sum(1 if t['Type'] == 'Thread' else 0 for t in handles),
+	# # # of handles of type directory
+	# 'handles.ndirectory': sum(1 if t['Type'] == 'Directory' else 0 for t in handles),
+	# # # of handles of type semaphore
+	# 'handles.nsemaphore': sum(1 if t['Type'] == 'Semaphore' else 0 for t in handles),
+	# # # of handles of type timer
+	# 'handles.ntimer': sum(1 if t['Type'] == 'Timer' else 0 for t in handles),
+	# # # of handles of type section
+	# 'handles.nsection': sum(1 if t['Type'] == 'Section' else 0 for t in handles),
+	# # # of handles of type mutant
+	# 'handles.nmutant': sum(1 if t['Type'] == 'Mutant' else 0 for t in handles),
+    # }
+
+# def extract_handles_features(jsondump):#LATEST
+#     df = pd.read_json(jsondump)
+
+#     try:
+#         return {
+#             'handles.nhandles': len(df),
+#             'handles.avg_handles_per_proc': len(df) / df['Pid'].nunique(),
+
+#             'handles.nport': (df['Type'] == 'Port').sum(),
+#             'handles.nfile': (df['Type'] == 'File').sum(),
+#             'handles.nevent': (df['Type'] == 'Event').sum(),
+#             'handles.ndesktop': (df['Type'] == 'Desktop').sum(),
+#             'handles.nkey': (df['Type'] == 'Key').sum(),
+#             'handles.nthread': (df['Type'] == 'Thread').sum(),
+#             'handles.ndirectory': (df['Type'] == 'Directory').sum(),
+#             'handles.nsemaphore': (df['Type'] == 'Semaphore').sum(),
+#             'handles.ntimer': (df['Type'] == 'Timer').sum(),
+#             'handles.nsection': (df['Type'] == 'Section').sum(),
+#             'handles.nmutant': (df['Type'] == 'Mutant').sum(),
+#         }
+#     except Exception as e:
+#         print(f"[ERROR] handle feature extraction failed: {e}")
+#         return {}
+
+# def extract_handles_features(jsondump):#LATEST 28/05 20:58
+#     df = pd.read_json(jsondump)
+#     features = {}
+
+#     try:
+#         features['handles.nhandles'] = len(df)
+#     except Exception as e:
+#         print(f"[WARN] handles.nhandles: {e}")
+
+#     try:
+#         features['handles.avg_handles_per_proc'] = len(df) / df['Pid'].nunique()
+#     except Exception as e:
+#         print(f"[WARN] handles.avg_handles_per_proc: {e}")
+
+#     type_keys = [
+#         ('handles.nport', 'Port'),
+#         ('handles.nfile', 'File'),
+#         ('handles.nevent', 'Event'),
+#         ('handles.ndesktop', 'Desktop'),
+#         ('handles.nkey', 'Key'),
+#         ('handles.nthread', 'Thread'),
+#         ('handles.ndirectory', 'Directory'),
+#         ('handles.nsemaphore', 'Semaphore'),
+#         ('handles.ntimer', 'Timer'),
+#         ('handles.nsection', 'Section'),
+#         ('handles.nmutant', 'Mutant'),
+#     ]
+
+#     for feat_name, handle_type in type_keys:
+#         try:
+#             features[feat_name] = (df['Type'] == handle_type).sum()
+#         except Exception as e:
+#             print(f"[WARN] {feat_name}: {e}")
+
+#     return features
+
+
+def extract_handles_features(jsondump):
+    features = {}
+
+    try:
+        df = pd.read_json(jsondump)
+    except Exception as e:
+        print(f"[ERROR] Could not read JSON: {e}")
+        return features
+
+    try:
+        features['handles.nhandles'] = len(df)
+    except Exception as e:
+        print(f"[WARN] handles.nhandles: {e}")
+        features['handles.nhandles'] = None
+
+    try:
+        pid_col = 'PID' if 'PID' in df.columns else 'Pid' if 'Pid' in df.columns else None
+        if pid_col:
+            handle_counts = df.groupby(pid_col).size()
+            features['pslist.avg_handlers'] = handle_counts.mean()
+        else:
+            print("[WARN] No PID column found for avg_handlers calculation.")
+            features['pslist.avg_handlers'] = None
+    except Exception as e:
+        print(f"[WARN] pslist.avg_handlers: {e}")
+        features['pslist.avg_handlers'] = None
+
+    type_keys = [
+        ('handles.nport', 'Port'),
+        ('handles.nfile', 'File'),
+        ('handles.nevent', 'Event'),
+        ('handles.ndesktop', 'Desktop'),
+        ('handles.nkey', 'Key'),
+        ('handles.nthread', 'Thread'),
+        ('handles.ndirectory', 'Directory'),
+        ('handles.nsemaphore', 'Semaphore'),
+        ('handles.ntimer', 'Timer'),
+        ('handles.nsection', 'Section'),
+        ('handles.nmutant', 'Mutant'),
+    ]
+
+    for feat_name, handle_type in type_keys:
+        try:
+            if 'Type' in df.columns:
+                features[feat_name] = (df['Type'] == handle_type).sum()
+            else:
+                print(f"[WARN] {feat_name}: 'Type' column missing.")
+                features[feat_name] = None
+        except Exception as e:
+            print(f"[WARN] {feat_name}: {e}")
+            features[feat_name] = None
+
+    return features
+
+
+
 
 def extract_ldrmodules_features(jsondump):
     df = pd.read_json(jsondump)
     return {
-        'ldrmodules.total': df.Base.size,                                       #Number of total modules
+        # 'ldrmodules.total': df.Base.size,                                       #Number of total modules
         'ldrmodules.not_in_load': len(df[df["InLoad"]==False]),                 #Number of modules missing from load list
         'ldrmodules.not_in_init': len(df[df["InInit"]==False]),                 #Number of modules missing from init list
         'ldrmodules.not_in_mem': len(df[df["InMem"]==False]),                   #Number of modules missing from mem list
-	'ldrmodules.nporc': df.Pid.unique().size,                               #Number of processes with modules in memory
+	# 'ldrmodules.nporc': df.Pid.unique().size,                               #Number of processes with modules in memory
         'ldrmodules.not_in_load_avg': len(df[df["InLoad"]==False])/df.Base.size,#Avg number of modules missing from load list
         'ldrmodules.not_in_init_avg': len(df[df["InInit"]==False])/df.Base.size,#Avg number of modules missing from init list
         'ldrmodules.not_in_mem_avg': len(df[df["InMem"]==False])/df.Base.size,  #Avg number of modules missing from mem list
@@ -197,499 +374,298 @@ def extract_malfind_features(jsondump):
 	'malfind.commitCharge': df.CommitCharge.sum(),                            #Sum of Commit Charges over time                                
 	'malfind.protection': len(df[df["Protection"]=="PAGE_EXECUTE_READWRITE"]),#Number of injections with all permissions 
 	'malfind.uniqueInjections': df.PID.unique().size,                         #Number of unique injections
-        'malfind.avgInjec_per_proc': df.PID.size/df.PID.unique().size,            #Average number of injections per process
-        'malfind.tagsVad': len(df[df["Tag"]=="Vad"]),                             #Number of Injections tagged as Vad
-        'malfind.tagsVads': len(df[df["Tag"]=="Vads"]),                           #Number of Injections tagged as Vads
-        'malfind.aveVPN_diff': df['End VPN'].sub(df['Start VPN']).sum()           #Avg VPN size of injections
+        # 'malfind.avgInjec_per_proc': df.PID.size/df.PID.unique().size,            #Average number of injections per process
+        # 'malfind.tagsVad': len(df[df["Tag"]=="Vad"]),                             #Number of Injections tagged as Vad
+        # 'malfind.tagsVads': len(df[df["Tag"]=="Vads"]),                           #Number of Injections tagged as Vads
+        # 'malfind.aveVPN_diff': df['End VPN'].sub(df['Start VPN']).sum()           #Avg VPN size of injections
     }
 
 def extract_modules_features(jsondump):
     df = pd.read_json(jsondump)
     return {
         'modules.nmodules': df.Base.size,                                          #Number of Modules
-        'modules.avgSize': df.Size.mean(),                             #Average size of the modules
-        'modules.FO_enabled': df.Base.size - len(df[df["File output"]=='Disabled'])#Number of Output enabled File Output
+        # 'modules.avgSize': df.Size.mean(),                             #Average size of the modules
+        # 'modules.FO_enabled': df.Base.size - len(df[df["File output"]=='Disabled'])#Number of Output enabled File Output
     }
-
 def extract_callbacks_features(jsondump):
     df = pd.read_json(jsondump)
-    return {
-        'callbacks.ncallbacks': df.Callback.size,                                               #Number of callbacks
-        'callbacks.nNoDetail': len(df[df["Detail"]=='None']),                                   #Number of callbacks with no detail
-        'callbacks.nBugCheck': len(df[df["Type"]=='KeBugCheckCallbackListHead']),               #Number of callback Type --> KeBugCheckCallbackListHead
-        'callbacks.nBugCheckReason': len(df[df["Type"]=='KeBugCheckReasonCallbackListHead']),   #Number of callback Type --> KeBugCheckReasonCallbackListHead
-        'callbacks.nCreateProc': len(df[df["Type"]=='PspCreateProcessNotifyRoutine']),          #Number of callback Type --> PspCreateProcessNotifyRoutine
-        'callbacks.nCreateThread': len(df[df["Type"]=='PspCreateThreadNotifyRoutine']),         #Number of callback Type --> PspCreateThreadNotifyRoutine
-        'callbacks.nLoadImg': len(df[df["Type"]=='PspLoadImageNotifyRoutine']),                 #Number of callback Type --> PspLoadImageNotifyRoutine
-        'callbacks.nRegisterCB': len(df[df["Type"]=='CmRegisterCallback']),                     #Number of callback Type --> CmRegisterCallback
-        'callback.nUnknownType': df.Callback.size - len(df[df["Type"]=='KeBugCheckCallbackListHead']) - len(df[df["Type"]=='CmRegisterCallback'])\
-                                                  - len(df[df["Type"]=='KeBugCheckReasonCallbackListHead']) - len(df[df["Type"]=='PspLoadImageNotifyRoutine'])\
-                                                  - len(df[df["Type"]=='PspCreateProcessNotifyRoutine']) - len(df[df["Type"]=='PspCreateThreadNotifyRoutine']),
-                                                                                                #Number of callback Type --> UNKNOWN
-                
-    }
+    features = {}
 
-def extract_cmdline_features(jsondump):
-    df = pd.read_json(jsondump)
-    return{
-        'cmdline.nLine': df.PID.size,                                                           #Number of cmd operations
-        'cmdline.not_in_C': df.PID.size - df['Args'].str.startswith("C:").sum(),                #Number of cmd initiating from C drive
-        'cmdline.n_exe': df['Process'].str.endswith("exe").sum(),                               #Number of cmd line exe
-        'cmdline.n_bin': df['Process'].str.endswith("bin").sum(),                               #Number of cmd line bin
-    }
-
-def extract_devicetree_features(jsondump):
-    df=pd.read_json(jsondump)
-    return{
-        'devicetree.ndevice': df.Type.size,                                                     #Number of devices in Device tree
-        'devicetree.nTypeNotDRV': df.Type.size - len(df[df["Type"]=='DRV']),                    #Number of devices with other than DRV type
-    }
-
-def extract_driverirp_features(jsondump):
-    df=pd.read_json(jsondump)
-    return{
-        'driverirp.nIRP': df.IRP.size,                                                          #Number of deviceirps
-        'driverirp.nModules': df.Module.unique().size,                                          #Number of diff modules
-        'driverirp.nSymbols': df.Symbol.unique().size,                                          #Number fo diff Symbols
-        'driverirp.n_diff_add': df.Address.unique().size,                                       #Number of diff address
-    }
-
-def extract_drivermodule_features(jsondump):
-    df=pd.read_json(jsondump)
-    return{
-        'drivermodule.nModules': df.Offset.size,                                                #Numner of driver module
-    }
-
-def extract_driverscan_features(jsondump):
-    df=pd.read_json(jsondump)
-    return{
-        'driverscan.nscan': df.Name.size,                                                       #Number of driverscans
-        'driverscan.avgSize': df.Size.sum()/df.Name.size,                                       #Average size of scan
-    }
-
-# def extract_dumpfiles_features(jsondump):     ##### Use if you need the features as creates a lot of garbage in VOLMEMLYZER Folder
-#     df=pd.read_json(jsondump)
-#     return{
-#         'dumpfiles.ndump': df.FileObject.size,                                                  #Number of dump files
-#         'dumpfiles.nCache': df.Cache.unique().size,                                             #Number of Cache
-#         'dumpfiles.nFile': df.FileName.unique().size,                                           #Number of distinct files
-#     }
-
-def extract_envars_features(jsondump):
-    df=pd.read_json(jsondump)
-    return{
-        'envars.nVars': df.Value.size,                                                          #Number of environment variables
-        'envars.nProc': df.PID.unique().size,                                                   #Number of Processes using Env vars
-        'envars.nBlock': df.Block.unique().size,                                                #Number of Blocks 
-        'envars.n_diff_var': df.Variable.unique().size,                                         #Number of diff variable names
-        'envars.nValue': df.Value.unique().size,                                                #Number of distinct value entries
-    }
-
-def extract_filescan_features(jsondump):
-    df=pd.read_json(jsondump)
-    return{
-        'filescan.nFiles': df.Name.size,                                                        #Number of files
-        'filescan.n_diff_file': df.Name.unique().size,                                          #Number of distinct files
-    }
-
-def extract_getsids_features(jsondump):
-    df=pd.read_json(jsondump)
-    return{
-        'getsids.nSIDcalls': df.SID.size,                                                       #Number of Security Identifier calls
-        'getsids.nProc': df.PID.unique().size,                                                  #Number of processes
-        'getsids.nDiffName': df.Name.unique().size,                                             #Number of Names
-        'getsids.n_diff_sids': df.SID.unique().size,                                            #Number of Unique SIDs
-        'getsids.avgSIDperProc': df.SID.size/df.PID.unique().size,                              #Avg number of SID per Process        
-    }
-
-def extract_mbrscan_features(jsondump):
-    df=pd.read_json(jsondump)
-    return{
-        'mbrscan.nMBRentries': df.Bootable.size,                                                #Number of MBR entries
-        'mbrscan.nDiskSig': df["Disk Signature"].unique().size,                                 #Number of Disk Signatures
-        'mbrscan.nPartType': df.PartitionType.unique().size,                                    #Number of partition type
-        'mbrscan.bootable': df.Bootable.size - df.Bootable.isna().size                          #Numner of bootable 
-    }
-
-def extract_memmap_features(jsondump):
-    df=pd.read_json(jsondump)
+    # Total callbacks
     try:
-        a = len(df)
-        b = len(df.Physical) - len(df[df['File output'] == 'Enabled'])
-        c = df['__children'].apply(len).mean()
-    except:
-        a = None
-        b = None
-        c = None
+        features['callbacks.ncallbacks'] = len(df)
+    except Exception as e:
+        print(f"[WARN] Failed to compute callbacks.ncallbacks: {e}")
 
-    return{
-        'memmap.nEntries': a,
-        'memmap.nEnabledF_op': b,
-        'memmap.AvgChildren': c     
-    }
+    # Anonymous callbacks
+    try:
+        features['callbacks.nanonymous'] = (df['Module'] == 'UNKNOWN').sum()
+    except Exception as e:
+        print(f"[WARN] Failed to compute callbacks.nanonymous: {e}")
 
-def extract_mftscan_features(jsondump):
-    df=pd.read_json(jsondump)
-    return{
-        'mftscan.MFTScan.nEntriesMFT': len(df), #101
-        'mftscan.MFTScan.nAttributeType': df['Attribute Type'].nunique(),
-        'mftscan.MFTScan.nRecordType': df['Record Type'].nunique(),
-        'mftscan.MFTScan.AvgRecordNum': df['Record Number'].mean(),
-        'mftscan.MFTScan.AvgLinkCount': df['Link Count'].mean(),
-        'mftscan.MFTScan.0x9_typeMFT': len(df[df['MFT Type'] == '0x9']),
-        'mftscan.MFTScan.0xd_typeMFT': len(df[df['MFT Type'] == '0xd']),
-        'mftscan.MFTScan.DirInUse_typeMFT': len(df[df['MFT Type'] == 'DirInUse']),
-        'mftscan.MFTScan.Removed_typeMFT': len(df[df['MFT Type'] == 'Removed']),
-        'mftscan.MFTScan.File_typeMFT': len(df[df['MFT Type'] == 'File']),
-        'mftscan.MFTScan.Other_typeMFT': len(df[~df['MFT Type'].isin(['0x9','0xd','DirInUse','Removed','File'])]),
-        'mftscan.MFTScan.AvgChildren': df['__children'].apply(len).mean()
-    }
-
-def extract_modscan_features(jsondump):
-    df = pd.read_json(jsondump)
-
-    # Initialize with defaults in case of missing columns
-    features = {
-        'modscan.nMod': len(df),
-        'modscan.nUniqueExt': 0,
-        'modscan.nDLL': 0,
-        'modscan.nSYS': 0,
-        'modscan.nEXE': 0,
-        'modscan.nOthers': 0,
-        'modscan.AvgSize': 0.0,
-        'modscan.MeanChildExist': 0.0,
-        'modscan.FO_Enabled': 0
-    }
-
-    if 'Name' in df.columns:
-        name_series = df['Name'].astype(str)
-
-        ext_series = name_series.str.extract(r'\.(\w+)$')[0].str.lower()
-        features['modscan.nUniqueExt'] = len(ext_series.dropna().unique())
-
-        features['modscan.nDLL'] = name_series.str.endswith(('.dll', '.DLL')).sum()
-        features['modscan.nSYS'] = name_series.str.endswith(('.sys', '.SYS')).sum()
-        features['modscan.nEXE'] = name_series.str.endswith(('.exe', '.EXE')).sum()
-
-        features['modscan.nOthers'] = (
-            features['modscan.nMod']
-            - features['modscan.nDLL']
-            - features['modscan.nSYS']
-            - features['modscan.nEXE']
-        )
-
-    if 'Size' in df.columns:
-        features['modscan.AvgSize'] = df['Size'].mean()
-
-    if '__children' in df.columns:
-        features['modscan.MeanChildExist'] = df['__children'].apply(
-            lambda x: bool(x) and isinstance(x, list) and len(x) > 0
-        ).mean()
-
-    if 'File output' in df.columns:
-        features['modscan.FO_Enabled'] = (df['File output'] == 'Enabled').sum()
+    # Generic callbacks
+    try:
+        features['callbacks.ngeneric'] = (df['Type'] == 'GenericKernelCallback').sum()
+    except Exception as e:
+        print(f"[WARN] Failed to compute callbacks.ngeneric: {e}")
 
     return features
 
 
-def extract_mutantscan_features(jsondump):
-    df=pd.read_json(jsondump)
-    return{
-        'mutantscan.nMutantObjects': len(df),
-        'mutantscan.nNamedMutant': df['Name'].isna().sum() 
+
+# def extract_callbacks_features(jsondump):
+#     df = pd.read_json(jsondump)
+#     return {
+#     'callbacks.ncallbacks': len(df),
+#     'callbacks.nanonymous': sum(1 if c['Module'] == 'UNKNOWN' else 0 for c in df),
+#     'callbacks.ngeneric': sum(1 if c['Type'] == 'GenericKernelCallback' else 0 for c in df),
+# }
+    # return {
+    #     'callbacks.ncallbacks': df.Callback.size,                                               #Number of callbacks
+    #     'callbacks.nNoDetail': len(df[df["Detail"]=='None']),                                   #Number of callbacks with no detail
+    #     'callbacks.nBugCheck': len(df[df["Type"]=='KeBugCheckCallbackListHead']),               #Number of callback Type --> KeBugCheckCallbackListHead
+    #     'callbacks.nBugCheckReason': len(df[df["Type"]=='KeBugCheckReasonCallbackListHead']),   #Number of callback Type --> KeBugCheckReasonCallbackListHead
+    #     'callbacks.nCreateProc': len(df[df["Type"]=='PspCreateProcessNotifyRoutine']),          #Number of callback Type --> PspCreateProcessNotifyRoutine
+    #     'callbacks.nCreateThread': len(df[df["Type"]=='PspCreateThreadNotifyRoutine']),         #Number of callback Type --> PspCreateThreadNotifyRoutine
+    #     'callbacks.nLoadImg': len(df[df["Type"]=='PspLoadImageNotifyRoutine']),                 #Number of callback Type --> PspLoadImageNotifyRoutine
+    #     'callbacks.nRegisterCB': len(df[df["Type"]=='CmRegisterCallback']),                     #Number of callback Type --> CmRegisterCallback
+    #     'callback.nUnknownType': df.Callback.size - len(df[df["Type"]=='KeBugCheckCallbackListHead']) - len(df[df["Type"]=='CmRegisterCallback'])\
+    #                                               - len(df[df["Type"]=='KeBugCheckReasonCallbackListHead']) - len(df[df["Type"]=='PspLoadImageNotifyRoutine'])\
+    #                                               - len(df[df["Type"]=='PspCreateProcessNotifyRoutine']) - len(df[df["Type"]=='PspCreateThreadNotifyRoutine']),
+    #                                                                                             #Number of callback Type --> UNKNOWN
+                
+    # }
+
+# def extract_psxview_features(jsondump):#LATEST
+#     psxview = json.load(jsondump)
+
+#     # Print diagnostics on missing fields
+#     for k in ['pslist', 'psscan', 'csrss', 'pspcid', 'session', 'deskthrd', 'thrdproc']:
+#         missing = [p for p in psxview if k not in p]
+#         if missing:
+#             print(f"Missing key: {k} in {len(missing)} out of {len(psxview)} entries")
+
+#     def count_false(key):
+#         return sum(1 for p in psxview if str(p.get(key, True)) == 'False')
+
+#     total = len(psxview) if psxview else 1  # avoid division by zero
+
+#     return {
+#         'psxview.not_in_pslist': count_false('pslist'),
+#         'psxview.not_in_eprocess_pool': count_false('psscan'),
+#         'psxview.not_in_ethread_pool': count_false('thrdproc'),
+#         'psxview.not_in_pspcid_list': count_false('pspcid'),
+#         'psxview.not_in_csrss_handles': count_false('csrss'),
+#         'psxview.not_in_session': count_false('session'),
+#         'psxview.not_in_deskthrd': count_false('deskthrd'),
+
+#         'psxview.not_in_pslist_false_avg': count_false('pslist') / total,
+#         'psxview.not_in_eprocess_pool_false_avg': count_false('psscan') / total,
+#         'psxview.not_in_ethread_pool_false_avg': count_false('thrdproc') / total,
+#         'psxview.not_in_pspcid_list_false_avg': count_false('pspcid') / total,
+#         'psxview.not_in_csrss_handles_false_avg': count_false('csrss') / total,
+#         'psxview.not_in_session_false_avg': count_false('session') / total,
+#         'psxview.not_in_deskthrd_false_avg': count_false('deskthrd') / total,
+#     }
+# def extract_psxview_features(jsondump):
+#     try:
+#         psxview = json.load(jsondump)
+#     except Exception as e:
+#         print(f"[ERROR] Failed to parse JSON: {e}")
+#         return {}
+
+#     keys = ['pslist', 'psscan', 'csrss', 'pspcid', 'session', 'deskthrd', 'thrdproc']
+#     total = len(psxview) if psxview else 1  # Avoid div by zero
+#     features = {}
+
+#     for k in keys:
+#         try:
+#             missing = [p for p in psxview if k not in p]
+#             if missing:
+#                 print(f"[INFO] Missing key: {k} in {len(missing)} / {len(psxview)} entries")
+
+#             count_false = sum(1 for p in psxview if str(p.get(k, True)) == 'False')
+
+#             features[f'psxview.not_in_{k}'] = count_false
+#             features[f'psxview.not_in_{k}_false_avg'] = count_false / total
+#         except Exception as e:
+#             print(f"[WARN] psxview.{k} extraction failed: {e}")
+
+#     return features
+def extract_psxview_features(jsondump):
+    psxview = json.load(jsondump)
+
+    # Auto-diagnostic for missing expected keys
+    expected_keys = ['pslist', 'psscan', 'csrss', 'pspcid', 'session', 'deskthrd', 'thrdproc']
+    for k in expected_keys:
+        missing = [p for p in psxview if k not in p or p[k] is None]
+        if missing:
+            print(f"[INFO] Missing key: {k} in {len(missing)} / {len(psxview)} entries")
+
+    def count_false(key):
+        return sum(1 for p in psxview if str(p.get(key, True)) == 'False')
+
+    total = len(psxview) if psxview else 1  # prevent division by zero
+
+    return {
+        'psxview.not_in_pslist': count_false('pslist'),
+        'psxview.not_in_eprocess_pool': count_false('psscan'),
+        'psxview.not_in_ethread_pool': count_false('thrdproc'),
+        'psxview.not_in_pspcid_list': count_false('pspcid'),
+        'psxview.not_in_csrss_handles': count_false('csrss'),
+        'psxview.not_in_session': count_false('session'),
+        'psxview.not_in_deskthrd': count_false('deskthrd'),
+
+        'psxview.not_in_pslist_false_avg': count_false('pslist') / total,
+        'psxview.not_in_eprocess_pool_false_avg': count_false('psscan') / total,
+        'psxview.not_in_ethread_pool_false_avg': count_false('thrdproc') / total,
+        'psxview.not_in_pspcid_list_false_avg': count_false('pspcid') / total,
+        'psxview.not_in_csrss_handles_false_avg': count_false('csrss') / total,
+        'psxview.not_in_session_false_avg': count_false('session') / total,
+        'psxview.not_in_deskthrd_false_avg': count_false('deskthrd') / total,
     }
 
-def extract_netscan_features(jsondump):
-    df=pd.read_json(jsondump)
-    return{
-        'netscan.nConn': len(df),
-        'netscan.nDistinctForeignAdd': df.ForeignAddr.unique().size,
-        'netscan.nDistinctForeignPort': df.ForeignPort.unique().size,
-        'netscan.nDistinctLocalAddr': df.LocalAddr.unique().size,
-        'netscan.nDistinctLocalPort': df.LocalPort.unique().size,
-        'netscan.nOwners': df.Owner.unique().size,
-        'netscan.nDistinctProc': df.PID.unique().size,
-        'netscan.nListening': len(df[df['State'].isin(['LISTENING'])]),
-        'netscan.Proto_TCPv4': len(df[df["Proto"]=="TCPv4"]),
-        'netscan.Proto_TCPv6': len(df[df["Proto"]=="TCPv4"]),
-        'netscan.Proto_UDPv4': len(df[df["Proto"]=="UDPv4"]),
-        'netscan.Proto_UDPv6': len(df[df["Proto"]=="UDPv6"])
-    }
 
-def extract_netstat_features(jsondump):
-    df=pd.read_json(jsondump)
-    return{
-        'netstat.nConn': len(df),
-        'netstat.nDistinctForeignAdd': df.ForeignAddr.unique().size,
-        'netstat.nUnexpectForeignAdd': df[df['ForeignAddr'].isin(['::','*'])].shape[0],
-        'netscan.nDistinctForeignPort': df.ForeignPort.unique().size,
-        'netstat.nDistinctLocalAddr': df.LocalAddr.unique().size,
-        'netstat.nUnexpectLocalAddr': df[df['LocalAddr'].isin(['::','::1'])].shape[0],
-        'netstat.nDistinctLocalPort': df.LocalPort.unique().size,
-        'netstat.nOwners': df.Owner.unique().size,
-        'netstat.nDistinctProc': df.PID.unique().size,
-        'netstat.nListening': len(df[df['State'].isin(['LISTENING'])]),
-        'netstat.nEstablished': len(df[df['State'].isin(['ESTABLISHED'])]),
-        'netstat.nClose_wait': len(df[df['State'].isin(['CLOSE_WAIT'])]),
-        'netstat.Proto_TCPv4': len(df[df["Proto"]=="TCPv4"]),
-        'netstat.Proto_TCPv6': len(df[df["Proto"]=="TCPv4"]),
-        'netstat.Proto_UDPv4': len(df[df["Proto"]=="UDPv4"]),
-        'netstat.Proto_UDPv6': len(df[df["Proto"]=="UDPv6"]),
-        'netstat.nNaNPID': df['PID'].isna().sum() 
-    }
 
-def extract_poolscanner_features(jsondump):
-    df=pd.read_json(jsondump)
-    return{
-        'poolscanner.nPool': len(df),
-        'poolscanner.nUniquePool': df.Tag.unique().size,
-    }
+# def rc2kv(rc):
+#     kv = []
+#     keys = rc['columns']
+#     for r in rc['rows']:
+#         entry = {}
+#         kv.append(entry)
+#         for k, v in zip(keys, r):
+#             entry[k] = v
+#     return kv
 
-def extract_privileges_features(jsondump):
-    df=pd.read_json(jsondump)
-    return{
-        'privileges.nTotal': len(df),
-        'privileges.nUniquePrivilege': df.Privilege.nunique(),
-        'privileges.nPID': df.PID.nunique(),
-        'privileges.nProcess': df.Process.nunique(),
-        'privileges.nAtt_D': len(df[df["Attributes"]=="Default"]),
-        'privileges.nAtt_P': len(df[df["Attributes"]=="Present"]),
-        'privileges.nAtt_PE': len(df[df["Attributes"]=="Present,Enabled"]),
-        'privileges.nAtt_PED': len(df[df["Attributes"]=="Present,Enabled,Default"]),
-        'privileges.nAtt_NaN': df['Attributes'].isna().sum() 
-    }
 
-def extract_pstree_features(jsondump):
-    df=pd.read_json(jsondump)
-    return{
-        'pstree.nTree': len(df),
-        'pstree.nHandles': len(df) - df['Handles'].isna().sum(),
-        'pstree.nPID': df.PID.nunique(),
-        'pstree.nPPID': df.PPID.nunique(),
-        'pstree.AvgThreads': df.Threads.mean(),
-        'pstree.nWow64': len(df[df["Wow64"]=="True"]),
-        'pstree.AvgChildren': df['__children'].apply(len).mean()
-    }
+# def extract_psxview_features(jsondump):
+#     df = pd.read_json(jsondump)
+#     methods = ['pslist', 'psscan', 'thrdscan', 'csrss']
+    
+#     features = {
+#         'psxview.nProcesses': len(df),
+#         'psxview.nHidden': 0,
+#         'psxview.hidden_ratio': 0
+#     }
 
-def extract_registry_certificates_features(jsondump):
-    df=pd.read_json(jsondump)
-    return{
-        'registry.certificates.nCert': len(df),
-        'registry.certificates.nID_Auto': len(df[df["Certificate ID"]=="AutoUpdate"]),
-        'registry.certificates.nID_Protected': len(df[df["Certificate ID"]=="ProtectedRoots"]),
-        'registry.certificates.nID_Others': len(df[~df['Certificate ID'].isin(['AutoUpdate','ProtectedRoots'])]) #174
-    }
+#     for method in methods:
+#         features[f'psxview.hidden_{method}'] = 0
+#         features[f'psxview.visible_{method}'] = 0
 
-def extract_registry_hivelist_features(jsondump):
-    df=pd.read_json(jsondump)
-    return{
-        'registry.hivelist.nFiles': len(df),
-        'registry.hivelist.nFO_Enabled': len(df) - len(df[df["File output"]=="Disabled"])
-    }
+#     hidden_count = 0
+#     visible_counts = []
 
-def extract_registry_hivescan_features(jsondump):
-    df=pd.read_json(jsondump)
-    return{
-        'registry.hivescan.nHives': len(df),
-        'registry.hivescan.Children_exist': df['__children'].apply(lambda x: len(x) if isinstance(x, list) else 0).astype(bool).sum()  
-    }
+#     for _, row in df.iterrows():
+#         visibility_flags = [row.get(method, False) for method in methods]
+#         n_visible = sum(visibility_flags)
+#         visible_counts.append(n_visible)
 
-def extract_registry_printkey_features(jsondump):
-    df=pd.read_json(jsondump)
-    return{
-        'registry.printkey.nKeys': len(df),
-        'registry.printkey.nDistinct': df.Name.nunique(),
-        'registry.printkey.nType_key': len(df[df["Type"]=="Key"]),
-        'registry.printkey.nType_other': len(df) - len(df[df["Type"]=="Key"]),
-        'registry.printkey.Volatile_0': len(df[df["Volatile"]==0]),
-        'registry.printkey.Avg_Children': df['__children'].apply(len).mean() 
-    }
+#         for i, method in enumerate(methods):
+#             if visibility_flags[i]:
+#                 features[f'psxview.visible_{method}'] += 1
+#             else:
+#                 features[f'psxview.hidden_{method}'] += 1
 
-def extract_registry_userassist_features(jsondump):
-    df=pd.read_json(jsondump)
-    return{
-        'registry.userassist.n': len(df),
-        'registry.userassist.nUnique': df["Hive Name"].nunique(),
-        'registry.userassist.Avg_Children': df['__children'].apply(len).mean(),
-        'registry.userassist.path_DNE': len(df[df["Path"]=="None"]),
-        'registry.userassist.type_key': len(df[df["Type"]=="Key"]),
-        'registry.userassist.type_other': len(df) - len(df[df["Type"]=="Key"])
-    }
+#         if n_visible == 0:
+#             hidden_count += 1
 
-def extract_sessions_features(jsondump):
-    df=pd.read_json(jsondump)
-    return{
-        'sessions.nSessions': len(df),
-        'sessions.nProcess': df.Process.nunique(),
-        'sessions.nUsers': df["User Name"].nunique(),
-        'sessions.nType': df["Session Type"].nunique(),
-        'sessions.Children_exist': df['__children'].apply(lambda x: len(x) if isinstance(x, list) else 0).astype(bool).sum()
-    }
+#     features['psxview.nHidden'] = hidden_count
+#     features['psxview.hidden_ratio'] = hidden_count / len(df) if len(df) > 0 else 0
+#     features['psxview.mean_visibility'] = sum(visible_counts) / len(visible_counts) if visible_counts else 0
+#     features['psxview.min_visibility'] = min(visible_counts) if visible_counts else 0
+#     features['psxview.max_visibility'] = max(visible_counts) if visible_counts else 0
+#     features['psxview.unique_to_one_method'] = sum([1 for count in visible_counts if count == 1])
 
-def extract_skeleton_key_features(jsondump):
-    df=pd.read_json(jsondump)
-    return{
-        'skeleton_key.nKey': len(df),
-        'skeleton_key.nProcess': df.Process.nunique(),
-        'skeleton_key.Found_True': len(df[df["Skeleton Key Found"]=="True"]),
-        'skeleton_key.Found_False': len(df[df["Skeleton Key Found"]=="False"])
-    }
+#     return features
 
-def extract_ssdt_features(jsondump):
-    df=pd.read_json(jsondump)
-    return{
-        'ssdt.n': len(df),
-        'ssdt.nIndex': df.Index.nunique(),
-        'ssdt.nModules': df.Module.nunique(),
-        'ssdt.nSymbols': df.Symbol.nunique(),
-        'ssdt.Children_exist': df['__children'].apply(lambda x: len(x) if isinstance(x, list) else 0).astype(bool).sum() 
-    }
-
-def extract_statistics_features(jsondump):
-    df=pd.read_json(jsondump)
-    return{
-        'statistics.Invalid_all': int(df.loc[0].at["Invalid Pages (all)"]),
-        'statistics.Invalid_large': int(df.loc[0].at["Invalid Pages (large)"]),
-        'statistics.Invalid_other': int(df.loc[0].at["Other Invalid Pages (all)"]),
-        'statistics.Swapped_all': int(df.loc[0].at["Swapped Pages (all)"]),
-        'statistics.Swapped_large': int(df.loc[0].at["Swapped Pages (large)"]),
-        'statistics.Valid_all': int(df.loc[0].at["Valid pages (all)"]),
-        'statistics.Valid_large': int(df.loc[0].at["Valid pages (large)"])
-    }
 
 
 def extract_svcscan_features(jsondump):
-    df=pd.read_json(jsondump)
-    return{
-        'svcscan.nServices': len(df),
-        'svcscan.nUniqueServ': df.Name.nunique(),
-        'svcscan.State_Run': len(df[df["State"]=="SERVICE_RUNNING"]),
-        'svcscan.State_Stop': len(df[df["State"]=="SERVICE_STOPPED"]),
-        'svcscan.Start_Sys': len(df[df["Start"]=="SERVICE_SYSTEM_START"]),
-        'svcscan.Start_Auto': len(df[df["Start"]=="SERVICE_AUTO_START"]),
-        'svcscan.Type_Own_Share': len(df[df["Type"]=="SERVICE_WIN32_OWN_PROCESS|SERVICE_WIN32_SHARE_PROCESS"]),
-        'svcscan.Type_Own': len(df[df["Type"]=="SERVICE_WIN32_OWN_PROCESS"]),
-        'svcscan.Type_Share': len(df[df["Type"]=="SERVICE_WIN32_SHARE_PROCESS"]),
-        'svcscan.Type_Own_Interactive': len(df[df["Type"]=="SERVICE_WIN32_OWN_PROCESS|SERVICE_INTERACTIVE_PROCESS"]),
-        'svcscan.Type_Share_Interactive': len(df[df["Type"]=="SERVICE_WIN32_SHARE_PROCESS|SERVICE_INTERACTIVE_PROCESS"]),
-        'svcscan.Type_Kernel_Driver': len(df[df["Type"]=="SERVICE_KERNEL_DRIVER"]),
-        'svcscan.Type_FileSys_Driver': len(df[df["Type"]=="SERVICE_FILE_SYSTEM_DRIVER"]),
-        'svcscan.Type_Others': len(df[~df['Type'].isin(['SERVICE_WIN32_OWN_PROCESS|SERVICE_WIN32_SHARE_PROCESS','SERVICE_WIN32_OWN_PROCESS','SERVICE_KERNEL_DRIVER','SERVICE_WIN32_SHARE_PROCESS','SERVICE_FILE_SYSTEM_DRIVER','SERVICE_WIN32_OWN_PROCESS|SERVICE_INTERACTIVE_PROCESS','SERVICE_WIN32_SHARE_PROCESS|SERVICE_INTERACTIVE_PROCESS'])])
-    }
+    try:
+        df = pd.read_json(jsondump)
+    except Exception as e:
+        print(f"[ERROR] svcscan: Could not read JSON: {e}")
+        return {}
 
-def extract_symlinkscan_features(jsondump):
-    df = pd.read_json(jsondump)
+    features = {}
+    try:
+        features['svcscan.nservices'] = len(df)
+    except Exception as e:
+        print(f"[WARN] Failed to compute svcscan.nservices: {e}")
 
-    features = {
-        'symlinkscan.nLinks': len(df),
-        'symlinkscan.nFrom': 0,
-        'symlinkscan.nTo': 0,
-        'symlinkscan.Avg_Children': 0.0
-    }
+    try:
+        features['svcscan.kernel_drivers'] = (df['Type'] == 'SERVICE_KERNEL_DRIVER').sum()
+    except Exception as e:
+        print(f"[WARN] Failed to compute svcscan.kernel_drivers: {e}")
 
-    if 'From Name' in df.columns:
-        features['symlinkscan.nFrom'] = df['From Name'].nunique()
+    try:
+        features['svcscan.fs_drivers'] = (df['Type'] == 'SERVICE_FILE_SYSTEM_DRIVER').sum()
+    except Exception as e:
+        print(f"[WARN] Failed to compute svcscan.fs_drivers: {e}")
 
-    if 'To Name' in df.columns:
-        features['symlinkscan.nTo'] = df['To Name'].nunique()
+    try:
+        features['svcscan.process_services'] = (df['Type'] == 'SERVICE_WIN32_OWN_PROCESS').sum()
+    except Exception as e:
+        print(f"[WARN] Failed to compute svcscan.process_services: {e}")
 
-    if '__children' in df.columns:
-        features['symlinkscan.Avg_Children'] = df['__children'].apply(
-            lambda x: len(x) if isinstance(x, list) else 0
-        ).mean()
+    try:
+        features['svcscan.shared_process_services'] = (df['Type'] == 'SERVICE_WIN32_SHARE_PROCESS').sum()
+    except Exception as e:
+        print(f"[WARN] Failed to compute svcscan.shared_process_services: {e}")
+
+    try:
+        features['svcscan.interactive_process_services'] = (df['Type'].str.contains('INTERACTIVE_PROCESS', na=False)).sum()
+    except Exception as e:
+        print(f"[WARN] Failed to compute svcscan.interactive_process_services: {e}")
+
+    try:
+        features['svcscan.nactive'] = (df['State'] == 'SERVICE_RUNNING').sum()
+    except Exception as e:
+        print(f"[WARN] Failed to compute svcscan.nactive: {e}")
 
     return features
 
 
-def extract_vadinfo_features(jsondump):
-    df=pd.read_json(jsondump)
-    return{
-        'vadinfo.nEntries': len(df),
-        'vadinfo.nFile': df.File.nunique(),
-        'vadinfo.nPID': df.PID.nunique(),
-        'vadinfo.nParent': df.Parent.nunique(),
-        'vadinfo.nProcess': df.Process.nunique(),
-        'vadinfo.Process_Malware': len(df[df["Process"]=="malware.exe"]),   ##### Tells if malware ran or not
-        'vadinfo.Type_Vad': len(df[df["Tag"]=="Vad "]),
-        'vadinfo.Type_VadS': len(df[df["Tag"]=="VadS"]),
-        'vadinfo.Type_VadF': len(df[df["Tag"]=="VadF"]),
-        'vadinfo.Type_VadI': len(df[df["Tag"]=="VadI"]),
-        'vadinfo.Protection_RO': len(df[df["Protection"]=="PAGE_READONLY"]),
-        'vadinfo.Protection_RW': len(df[df["Protection"]=="PAGE_READWRITE"]),
-        'vadinfo.Protection_NA': len(df[df["Protection"]=="PAGE_NOACCESS"]),
-        'vadinfo.Protection_EWC': len(df[df["Protection"]=="PAGE_EXECUTE_WRITECOPY"]),
-        'vadinfo.Protection_WC': len(df[df["Protection"]=="PAGE_WRITECOPY"]),
-        'vadinfo.Protection_ERW': len(df[df["Protection"]=="PAGE_EXECUTE_READWRITE"]),
-        'vadinfo.Avg_Children': df['__children'].apply(len).mean()
-    }
+# def extract_svcscan_features(jsondump):
+#     df=pd.read_json(jsondump)
+#     # return{
+#     #     'svcscan.nServices': len(df),
+#     #     'svcscan.nUniqueServ': df.Name.nunique(),
+#     #     'svcscan.State_Run': len(df[df["State"]=="SERVICE_RUNNING"]),
+#     #     'svcscan.State_Stop': len(df[df["State"]=="SERVICE_STOPPED"]),
+#     #     'svcscan.Start_Sys': len(df[df["Start"]=="SERVICE_SYSTEM_START"]),
+#     #     'svcscan.Start_Auto': len(df[df["Start"]=="SERVICE_AUTO_START"]),
+#     #     'svcscan.Type_Own_Share': len(df[df["Type"]=="SERVICE_WIN32_OWN_PROCESS|SERVICE_WIN32_SHARE_PROCESS"]),
+#     #     'svcscan.Type_Own': len(df[df["Type"]=="SERVICE_WIN32_OWN_PROCESS"]),
+#     #     'svcscan.Type_Share': len(df[df["Type"]=="SERVICE_WIN32_SHARE_PROCESS"]),
+#     #     'svcscan.Type_Own_Interactive': len(df[df["Type"]=="SERVICE_WIN32_OWN_PROCESS|SERVICE_INTERACTIVE_PROCESS"]),
+#     #     'svcscan.Type_Share_Interactive': len(df[df["Type"]=="SERVICE_WIN32_SHARE_PROCESS|SERVICE_INTERACTIVE_PROCESS"]),
+#     #     'svcscan.Type_Kernel_Driver': len(df[df["Type"]=="SERVICE_KERNEL_DRIVER"]),
+#     #     'svcscan.Type_FileSys_Driver': len(df[df["Type"]=="SERVICE_FILE_SYSTEM_DRIVER"]),
+#     #     'svcscan.Type_Others': len(df[~df['Type'].isin(['SERVICE_WIN32_OWN_PROCESS|SERVICE_WIN32_SHARE_PROCESS','SERVICE_WIN32_OWN_PROCESS','SERVICE_KERNEL_DRIVER','SERVICE_WIN32_SHARE_PROCESS','SERVICE_FILE_SYSTEM_DRIVER','SERVICE_WIN32_OWN_PROCESS|SERVICE_INTERACTIVE_PROCESS','SERVICE_WIN32_SHARE_PROCESS|SERVICE_INTERACTIVE_PROCESS'])])
+#     # }
+#     return {
+#         'svcscan.nservices': len(df),
+#         'svcscan.kernel_drivers': sum(1 if s['ServiceType'] == 'SERVICE_KERNEL_DRIVER' else 0 for s in df),
+#         'svcscan.fs_drivers': sum(1 if s['ServiceType'] == 'SERVICE_FILE_SYSTEM_DRIVER' else 0 for s in df),
+#         'svcscan.process_services': sum(1 if s['ServiceType'] == 'SERVICE_WIN32_OWN_PROCESS' else 0 for s in df),
+#         'svcscan.shared_process_services': sum(1 if s['ServiceType'] == 'SERVICE_WIN32_SHARE_PROCESS' else 0 for s in df),
+#         'svcscan.interactive_process_services': sum(1 if s['ServiceType'] == 'SERVICE_INTERACTIVE_PROCESS' else 0 for s in df),
+#         'svcscan.nactive': sum(1 if s['State'] == 'SERVICE_RUNNING' else 0 for s in df),
+#     }
 
-def extract_vadwalk_features(jsondump):
-    df=pd.read_json(jsondump)
-    return{
-        'vadwalk.Avg_Size': (df['End'] - df['Start']).mean(),
-    }
 
-def extract_verinfo_features(jsondump):
-    df=pd.read_json(jsondump)
-    return{
-        'verinfo.nEntries': len(df),
-        'verinfo.nUniqueProg': df.Name.nunique(),
-        'verinfo.nPID': df.PID.nunique(),
-        'verinfo.Avg_Children': df['__children'].apply(len).mean()
-    }
-
-def extract_virtmap_features(jsondump):
-    df=pd.read_json(jsondump)
-    return{
-        'virtmap.nEntries': len(df),
-        'virtmap.Avg_Offset_Size': (df['Start offset'] - df['End offset']).mean(),
-        'virtmap.Avg_Children': df['__children'].apply(len).mean() #254
-    }
 
 VOL_MODULES = {
-    'info': timed(extract_winInfo_features),
-    'pslist': timed(extract_pslist_features),
-    'dlllist': timed(extract_dlllist_features),
-    'handles':timed(extract_handles_features),
-    'ldrmodules':timed(extract_ldrmodules_features),
-    'malfind':timed(extract_malfind_features),
-    'modules':timed(extract_modules_features),
-    'callbacks':timed(extract_callbacks_features),
-    'cmdline':timed(extract_cmdline_features),
-    'devicetree':timed(extract_devicetree_features),
-    'driverirp':timed(extract_driverirp_features),
-    'drivermodule':timed(extract_drivermodule_features),
-    'driverscan':timed(extract_driverscan_features),
-    #####'dumpfiles':timed(extract_dumpfiles_features,        # Creates Junk files in the Folder where VolMemLyzer is present [TRY NOT TO USE]
-    'envars':timed(extract_envars_features),
-    'filescan':timed(extract_filescan_features),
-    'getsids':timed(extract_getsids_features),
-    'mbrscan':timed(extract_mbrscan_features),
-    #####'memmap':timed(extract_memmap_features,             # Volatility Incompatibility [DO NOT USE]
-    'mftscan.MFTScan':timed(extract_mftscan_features),
-    'modscan':timed(extract_modscan_features),
-    'mutantscan':timed(extract_mutantscan_features),
-    'netscan':timed(extract_netscan_features),
-    'netstat':timed(extract_netstat_features),
-    'poolscanner':timed(extract_poolscanner_features),
-    'privileges':timed(extract_privileges_features),
-    'pstree':timed(extract_pstree_features),
-    'registry.certificates':timed(extract_registry_certificates_features),
-    'registry.hivelist':timed(extract_registry_hivelist_features),
-    'registry.hivescan':timed(extract_registry_hivescan_features),
-    'registry.printkey':timed(extract_registry_printkey_features),
-    'registry.userassist':timed(extract_registry_userassist_features),
-    'sessions':timed(extract_sessions_features),
-    'skeleton_key':timed(extract_skeleton_key_features),
-    'ssdt':timed(extract_ssdt_features),
-    'statistics':timed(extract_statistics_features),
-    'svcscan':timed(extract_svcscan_features),
-    'symlinkscan': timed(extract_symlinkscan_features),
-    'vadinfo': timed(extract_vadinfo_features),
-    'vadwalk': timed(extract_vadwalk_features),
-    'verinfo': timed(extract_verinfo_features),
-    'virtmap': timed(extract_virtmap_features)
-
+    'pslist': extract_pslist_features,
+    'dlllist': extract_dlllist_features,
+    'handles': extract_handles_features,
+    'ldrmodules': extract_ldrmodules_features,
+    'malfind': extract_malfind_features,
+    'modules': extract_modules_features,
+    'callbacks': extract_callbacks_features,
+    'svcscan': extract_svcscan_features,
+    'psxview.PsXView':extract_psxview_features
 }
 
 
@@ -720,7 +696,7 @@ def write_dict_to_csv(filename, dictionary,memdump_path):
 
 
 
-@timed
+
 def extract_all_features_from_memdump(memdump_path, CSVoutput_path, volatility_path):
     features = {}
     print('=> Outputting to', CSVoutput_path)
@@ -758,17 +734,14 @@ def parse_args():
 if __name__ == '__main__':
     p, args = parse_args()
 
-    #print(args.memdump)
+    print(args.memdump)
     folderpath = str(args.memdump)
-    file_list = sorted(os.listdir(folderpath), key=lambda x: -os.path.getmtime(os.path.join(folderpath, x)), reverse=True)
-
     print(folderpath)
 
-    for filename in file_list:
-        print("==> Now resolving features for : ",filename)
-        print()
+    for filename in os.listdir(folderpath):
+        print(filename)
         file_path = os.path.join(folderpath, filename)
-        #print(file_path)
+        print(file_path)
 
         if (file_path).endswith('.raw') or (file_path).endswith('.mem') or (file_path).endswith('.vmem') or (file_path).endswith('.mddramimage'):
             extract_all_features_from_memdump((file_path), args.output, args.volatility)
