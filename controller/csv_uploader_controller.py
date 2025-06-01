@@ -1,8 +1,10 @@
+import os
 import numpy as np
 from PyQt6.QtWidgets import QFileDialog
 from PyQt6.QtCore import QDate, QTime, Qt
 from model.malware_model import MalwareDetector
-from utils.plot_utils import generate_confusion_matrix_pixmap
+from utils.plot_utils import generate_confusion_matrix_pixmap, load_template
+from utils.plot_utils import generate_shap_explanation
 
 class CSVUploaderController:
     def __init__(self, view):
@@ -18,6 +20,11 @@ class CSVUploaderController:
         self.file_path, _ = QFileDialog.getOpenFileName(self.view, "Open CSV File", "", "CSV Files (*.csv)")
         if self.file_path:
             try:
+                with open(self.file_path, 'r') as f:
+                    header_line = f.readline().strip()
+                    all_columns = header_line.split(',')  
+                    self.feature_names = all_columns[2:] 
+
                 self.data = np.genfromtxt(self.file_path, delimiter=',', dtype=str, skip_header=1)
                 if self.data.ndim == 1:
                     self.data = self.data.reshape(1, -1)
@@ -39,30 +46,45 @@ class CSVUploaderController:
                 total_count = len(binary_preds)
                 status = "Potential Malware Detected" if malicious_count > 0 else "Device Clean"
 
-                result_message = f"""
-                    <div style='text-align: center; font-size: 22px; font-weight: bold; margin-bottom: 20px;'>Scan Results Summary:</div>
+                template_path = os.path.join("templates", "scan_summary_template.html")
+                template = load_template(template_path)
 
-                    <div style='line-height: 1.8; font-size: 18px; margin-bottom: 45px;'>
-                        - Total Processes Scanned: {total_count}<br>
-                        - Benign Processes: {benign_count}<br>
-                        - Malware Processes: <span style='color: red;'>{malicious_count}</span><br><br><br><br>
+                result_message = template.format(
+                    total_count=total_count,
+                    benign_count=benign_count,
+                    malicious_count=malicious_count,
+                    status=status,
+                    date_str=QDate.currentDate().toString(Qt.DateFormat.ISODate),
+                    time_str=QTime.currentTime().toString(Qt.DateFormat.ISODate)
+                    
+                )
 
-                        <span style='font-size: 22px;'>Device Status: </span>
-                        <span style='color: red;'>{status}</span> ({malicious_count} out of {total_count} processes flagged as malicious).
-                    </div>
-
-                    <br><br><br><br><br><br><br><br> """
-
-                date_str = QDate.currentDate().toString(Qt.DateFormat.ISODate)
-                time_str = QTime.currentTime().toString(Qt.DateFormat.ISODate)
-                datetime_str = f"""
-                    <div style='position: absolute; right: 10px; font-size: 16px; text-align: right;'>
-                        Scan Date: {date_str} {time_str}
-                    </div>
-                """
-
-                self.view.data_display_ref.setText(f"{result_message}{datetime_str}")
+                self.view.data_display_ref.setText(result_message)
                 self.view.tab_widget_ref.setVisible(True)
+
+                try:
+                    raw_X = self.dataFromINDEX2Col.astype(float)
+                    X_scaled = self.model.scaler.transform(raw_X)
+                    probabilities = self.model.model.predict(X_scaled)
+                    binary_preds = (probabilities > 0.5).astype(int).flatten()
+                    malicious_indices = np.where(binary_preds == 1)[0]
+
+                    for idx in malicious_indices:
+                        print(f"Explaining Process {idx+1}")
+                        print("Raw values for process:", raw_X[idx])
+                        sample = X_scaled[idx]
+
+                        shap_text = generate_shap_explanation(
+                            self.model.model,
+                            X_scaled,
+                            sample,
+                            self.feature_names
+                        )
+                        self.view.append_shap_explanation(idx + 1, shap_text)
+                        
+                except Exception as e:
+                    print(f"Error generating SHAP explanation: {e}")
+
                 self.update_plots()
 
             except Exception as e:

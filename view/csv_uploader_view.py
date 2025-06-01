@@ -43,11 +43,13 @@ class CSVUploaderView(QWidget):
         self.confusion_tab = QWidget()
         self.data_tab = QWidget()
         self.misclassified_tab = QWidget()
+        self.explanation_tab = QWidget()
 
         self.tab_widget.addTab(self.confusion_tab, "Confusion Matrix")
         self.tab_widget.addTab(self.data_tab, "Data")
         self.tab_widget.addTab(self.misclassified_tab, "Misclassified Processes")
-
+        self.tab_widget.addTab(self.explanation_tab, "Explainability")
+        
         self.confusion_layout = QVBoxLayout(self.confusion_tab)
         self.confusion_graphics_view = QGraphicsView()
         self.confusion_graphics_scene = QGraphicsScene()
@@ -79,6 +81,11 @@ class CSVUploaderView(QWidget):
         self.right_layout.addWidget(self.data_display)
         self.data_display.setText("No file uploaded")
 
+        self.explanation_layout = QVBoxLayout(self.explanation_tab)
+        self.explanation_text = QTextEdit()
+        self.explanation_text.setReadOnly(True)
+        self.explanation_layout.addWidget(self.explanation_text)
+      
         self.process_button_ref = self.process_button
         self.tab_widget_ref = self.tab_widget
         self.data_display_ref = self.data_display
@@ -97,3 +104,19 @@ class CSVUploaderView(QWidget):
         self.confusion_graphics_view_ref.setSceneRect(QRectF(pixmap.rect()))
         self.confusion_graphics_view_ref.update()
         self.confusion_graphics_view_ref.viewport().update()
+
+    def update_shap_explanation(self, pixmap, explanation):
+        self.explanation_graphics_scene.clear()
+        self.explanation_graphics_scene.addPixmap(pixmap)
+        self.explanation_graphics_view.setSceneRect(QRectF(pixmap.rect()))
+        self.explanation_graphics_view.update()
+        self.explanation_graphics_view.viewport().update()
+        self.explanation_text.setPlainText(explanation)
+
+
+    def append_shap_explanation(self, process_number, explanation):
+        header = f"🔍 Process {process_number} - Explanation:\n"
+        separator = "-" * 60 + "\n"
+        existing_text = self.explanation_text.toPlainText()
+        new_text = f"{existing_text}\n{header}{explanation}\n{separator}"
+        self.explanation_text.setPlainText(new_text)
