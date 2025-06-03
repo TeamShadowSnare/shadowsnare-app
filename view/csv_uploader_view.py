@@ -117,3 +117,9 @@ class CSVUploaderView(QWidget):
 
     def show_message(self, message):
         self.data_display.setText(message)
+
+    def append_shap_explanation(self, process_index: int, text: str):
+        current = self.explanation_text_edit.toPlainText()
+        new_text = f"🔍 Process {process_index} Explanation:\n{text}\n\n"
+        self.explanation_text_edit.setPlainText(current + new_text)
+
