@@ -1,4 +1,4 @@
-from PyQt6.QtWidgets import QWidget, QDialog, QVBoxLayout, QLabel, QPushButton, QTextEdit, QTabWidget, QSplitter
+from PyQt6.QtWidgets import QFrame, QTextEdit , QWidget, QDialog, QVBoxLayout, QLabel, QPushButton, QTextBrowser, QTabWidget, QSplitter
 from PyQt6.QtCore import Qt, QRectF
 
 class UserMode(QWidget):
@@ -58,19 +58,23 @@ class UserMode(QWidget):
         self.main_layout.addWidget(self.analysis_widget)
 
         # 📋 Summary
-        self.data_display = QTextEdit()
-        self.data_display.setReadOnly(True)
-        self.data_display.setText("No file uploaded.")
-        self.analysis_layout.addWidget(self.data_display)
+        self.summary_container = QFrame()
+        self.summary_layout = QVBoxLayout(self.summary_container)
+        self.summary_layout.setContentsMargins(0, 0, 0, 0)
 
-        # 📊 SHAP Button
-        self.explanation_popup_button = QPushButton("📊 Click here for explanation")
-        self.explanation_popup_button.setStyleSheet(self._button_style("#9b59b6", "#af7ac5"))
-        self.explanation_popup_button.setVisible(False)
-        self.analysis_layout.addWidget(self.explanation_popup_button)
+        # 📊 Explanation: no button — just a clickable text link in HTML
+        self.data_display = QTextBrowser()
+        self.data_display.setReadOnly(True)
+        self.data_display.setOpenExternalLinks(False)  # Required to detect clicks
+        self.data_display.setAcceptRichText(True)
+        self.data_display.anchorClicked.connect(lambda _: self.show_explanation_popup())
+        self.summary_layout.addWidget(self.data_display)
+
+        self.analysis_layout.addWidget(self.summary_container)
 
         self.explanation_text_edit = QTextEdit()
         self.explanation_text_edit.setReadOnly(True)
+
 
         self.setup_explanation_popup()
 
@@ -92,7 +96,6 @@ class UserMode(QWidget):
         self.create_csv_button.clicked.connect(controller.handle_create_csv)
         self.upload_csv_button.clicked.connect(controller.handle_upload_csv)
         self.continue_button.clicked.connect(controller.handle_analyze_file)
-        self.explanation_popup_button.clicked.connect(controller.handle_show_popup)  # Add this
 
     def show_analysis_layout(self):
         self.title.setVisible(False)
@@ -103,10 +106,9 @@ class UserMode(QWidget):
 
         self.analysis_widget.setVisible(True)
 
-    # Data display methods
     def show_summary(self, summary_html):
-        self.data_display.setText(summary_html)
-        self.explanation_popup_button.setVisible(True)
+        full_html = summary_html + "<br><a href='#'> Click here for explanation</a>"
+        self.data_display.setHtml(full_html)
 
 
     def show_explanations(self, explanations_text):
