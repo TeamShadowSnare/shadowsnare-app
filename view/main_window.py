@@ -1,7 +1,8 @@
 from PyQt6.QtWidgets import QMainWindow, QWidget, QHBoxLayout, QListWidget, QStackedWidget
+from controller.user_mode_controller import UserModeController
 from view.home_view import HomeView
 from view.csv_uploader_view import CSVUploaderView
-# from view.user_mode_view_view import UserMode
+from view.user_mode_view import UserMode
 
 class MainWindow(QMainWindow):
     def __init__(self):
@@ -28,10 +29,13 @@ class MainWindow(QMainWindow):
 
         self.home_view = HomeView()
         self.csv_uploader_view = CSVUploaderView()
-
+        self.user_mode_view = UserMode()
+        
+        self.user_mode_controller = UserModeController(self.user_mode_view)
+        
         self.stack.addWidget(self.home_view)           # index 0
         self.stack.addWidget(self.csv_uploader_view)   # index 1
-        # self.stack.addWidget(self.user_mode_view)      # index 2
+        self.stack.addWidget(self.user_mode_view)      # index 2
 
         self.nav_list.setCurrentRow(0)
         self.stack.setCurrentIndex(0)
