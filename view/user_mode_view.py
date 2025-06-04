@@ -1,4 +1,4 @@
-from PyQt6.QtWidgets import QWidget, QVBoxLayout, QLabel, QPushButton, QTextEdit, QTabWidget, QSplitter
+from PyQt6.QtWidgets import QWidget, QDialog, QVBoxLayout, QLabel, QPushButton, QTextEdit, QTabWidget, QSplitter
 from PyQt6.QtCore import Qt, QRectF
 
 class UserMode(QWidget):
@@ -50,51 +50,29 @@ class UserMode(QWidget):
         self.continue_button.setVisible(False)
         self.main_layout.addWidget(self.continue_button, alignment=Qt.AlignmentFlag.AlignCenter)
 
-        # Analysis Layout (hidden initially)
-        self.analysis_splitter = QSplitter(Qt.Orientation.Horizontal)
-        self.main_layout.addWidget(self.analysis_splitter)
-        self.analysis_splitter.setVisible(False)
+        # ✅ REPLACE with just the right widget directly:
+        self.analysis_widget = QWidget()
+        self.analysis_layout = QVBoxLayout()
+        self.analysis_widget.setLayout(self.analysis_layout)
+        self.analysis_widget.setVisible(False)
+        self.main_layout.addWidget(self.analysis_widget)
 
-        # Left: Tabs
-        self.left_widget = QWidget()
-        self.left_layout = QVBoxLayout()
-        self.left_widget.setLayout(self.left_layout)
-        self.analysis_splitter.addWidget(self.left_widget)
-
-        self.tab_widget = QTabWidget()
-        self.left_layout.addWidget(self.tab_widget)
-
-        self.data_tab = QWidget()
-        self.explanation_tab = QWidget()
-
-        self.tab_widget.addTab(self.data_tab, "Data")
-        self.tab_widget.addTab(self.explanation_tab, "Explainability")
-
-        self.data_layout = QVBoxLayout(self.data_tab)
-        self.data_text_edit = QTextEdit()
-        self.data_text_edit.setReadOnly(True)
-        self.data_layout.addWidget(self.data_text_edit)
-
-        self.explanation_layout = QVBoxLayout(self.explanation_tab)
-        self.explanation_text_edit = QTextEdit()
-        self.explanation_text_edit.setReadOnly(True)
-        self.explanation_layout.addWidget(self.explanation_text_edit)
-
-        # Right: Summary Panel
-        self.right_widget = QWidget()
-        self.right_layout = QVBoxLayout()
-        self.right_widget.setLayout(self.right_layout)
-        self.analysis_splitter.addWidget(self.right_widget)
-        self.analysis_splitter.setStretchFactor(0, 3)  # Left panel (tabs)
-        self.analysis_splitter.setStretchFactor(1, 2)  # Right panel (summary)
-
-        self.right_widget.setMinimumWidth(600)
-        self.right_widget.setMaximumWidth(600)
-
+        # 📋 Summary
         self.data_display = QTextEdit()
         self.data_display.setReadOnly(True)
         self.data_display.setText("No file uploaded.")
-        self.right_layout.addWidget(self.data_display)
+        self.analysis_layout.addWidget(self.data_display)
+
+        # 📊 SHAP Button
+        self.explanation_popup_button = QPushButton("📊 Click here for explanation")
+        self.explanation_popup_button.setStyleSheet(self._button_style("#9b59b6", "#af7ac5"))
+        self.explanation_popup_button.setVisible(False)
+        self.analysis_layout.addWidget(self.explanation_popup_button)
+
+        self.explanation_text_edit = QTextEdit()
+        self.explanation_text_edit.setReadOnly(True)
+
+        self.setup_explanation_popup()
 
     def _button_style(self, color, hover_color):
         return f"""
@@ -114,25 +92,22 @@ class UserMode(QWidget):
         self.create_csv_button.clicked.connect(controller.handle_create_csv)
         self.upload_csv_button.clicked.connect(controller.handle_upload_csv)
         self.continue_button.clicked.connect(controller.handle_analyze_file)
+        self.explanation_popup_button.clicked.connect(controller.handle_show_popup)  # Add this
 
     def show_analysis_layout(self):
-        # Hide intro
         self.title.setVisible(False)
         self.instructions.setVisible(False)
         self.create_csv_button.setVisible(False)
         self.upload_csv_button.setVisible(False)
         self.continue_button.setVisible(False)
-        # Show analysis view
-        self.analysis_splitter.setVisible(True)
-        self.analysis_splitter.setSizes([850, 600])
-        self.analysis_splitter.setMinimumHeight(600)  # or try 800 for more height
+
+        self.analysis_widget.setVisible(True)
 
     # Data display methods
     def show_summary(self, summary_html):
         self.data_display.setText(summary_html)
+        self.explanation_popup_button.setVisible(True)
 
-    def show_data(self, data_text):
-        self.data_text_edit.setPlainText(data_text)
 
     def show_explanations(self, explanations_text):
         self.explanation_text_edit.setText(explanations_text)
@@ -141,3 +116,18 @@ class UserMode(QWidget):
         current = self.explanation_text_edit.toPlainText()
         new_text = f"🔍 Process {process_index} Explanation:\n{text}\n\n"
         self.explanation_text_edit.setPlainText(current + new_text)
+
+
+    def setup_explanation_popup(self):
+        self.explanation_dialog = QDialog(self)
+        self.explanation_dialog.setWindowTitle("Explainability")
+        self.explanation_dialog.setMinimumSize(600, 400)
+
+        self.explanation_popup_layout = QVBoxLayout(self.explanation_dialog)
+        self.explanation_text_edit_popup = QTextEdit()
+        self.explanation_text_edit_popup.setReadOnly(True)
+        self.explanation_popup_layout.addWidget(self.explanation_text_edit_popup)
+
+    def show_explanation_popup(self):
+        self.explanation_text_edit_popup.setPlainText(self.explanation_text_edit.toPlainText())
+        self.explanation_dialog.exec()

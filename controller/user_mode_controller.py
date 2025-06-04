@@ -35,12 +35,6 @@ class UserModeController:
             self.data, self.feature_names = self.predictor.load_csv(file_path)
             self.feature_data = self.data[:, 2:].astype(float)
 
-            formatted_data = "\n\n".join([
-                f"Process {i+1}:\n" + ", ".join(row)
-                for i, row in enumerate(self.data[:, 2:])
-            ])
-            self.view.show_data(formatted_data)
-
             X_scaled = self.predictor.model.scaler.transform(self.feature_data)
             self.explainer = ExplainabilityService(
                 model=self.predictor.model.model,
@@ -75,13 +69,6 @@ class UserModeController:
             )
             self.view.show_summary(summary_html)
 
-            # Data preview
-            formatted_data = "\n\n".join([
-                f"Process {i+1}:\n" + ", ".join(row)
-                for i, row in enumerate(self.data[:, 2:])
-            ])
-            self.view.show_data(formatted_data)
-
             # SHAP explanations
             self.view.explanation_text_edit.clear()
             for idx in np.where(binary_preds == 1)[0]:
@@ -93,3 +80,7 @@ class UserModeController:
 
         except Exception as e:
             self.view.show_summary(f"❌ Error during analysis: {e}")
+
+    def handle_show_popup(self):
+        self.view.show_explanation_popup()
+
