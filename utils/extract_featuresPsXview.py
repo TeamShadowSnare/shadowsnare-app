@@ -7,7 +7,7 @@ import tempfile
 import os
 import pandas as pd
 
-
+plugin_dict = {}
 # Extractor functions extracts features from the Volatility
 
 def extract_winInfo_features(jsondump):
@@ -28,12 +28,17 @@ def extract_winInfo_features(jsondump):
         'info.npro': c,
         'info.IsPAE': d
     }
+
 def extract_pslist_features(jsondump):
-    df = pd.read_json(jsondump)
     features = {}
+    try:
+        df = pd.read_json(jsondump)
+        plugin_dict["pslist.pids"] = set(df["PID"] if "PID" in df.columns else df["Pid"])  # For psxview
+    except Exception as e:
+        print(f"[ERROR] Could not read JSON: {e}")
+        return features
 
     try:
-        print("nproc = ",df.PPID.size)
         features['pslist.nproc'] = df.PPID.size
     except Exception as e:
         print(f"[WARN] pslist.nproc: {e}")
@@ -48,14 +53,31 @@ def extract_pslist_features(jsondump):
     except Exception as e:
         print(f"[WARN] pslist.avg_threads: {e}")
 
-
-
     try:
         features['pslist.nprocs64bit'] = len(df[df["Wow64"] == "True"])
     except Exception as e:
         print(f"[WARN] pslist.nprocs64bit: {e}")
 
+    return features
 
+def extract_session_features(jsondump):
+    features = {}
+    try:
+        df = pd.read_json(jsondump)
+        plugin_dict["session.pids"] = set(df["PID"] if "PID" in df.columns else df["Pid"])  # For psxview
+    except Exception as e:
+        print(f"[ERROR] session plugin failed: {e}")
+        plugin_dict["session.pids"] = set()
+    return features
+
+def extract_poolscan_features(jsondump):
+    features = {}
+    try:
+        df = pd.read_json(jsondump)
+        plugin_dict["pool.pids"] = set(df["PID"] if "PID" in df.columns else df["Pid"])  # For psxview
+    except Exception as e:
+        print(f"[ERROR] pool plugin failed: {e}")
+        plugin_dict["pool.pids"] = set()
     return features
 
 
@@ -85,11 +107,66 @@ def extract_dlllist_features(jsondump):
 
 
 
+# def extract_handles_features(jsondump):
+#     features = {}
+
+#     try:
+#         df = pd.read_json(jsondump)
+#         plugin_dataframes["handles"] = df
+#     except Exception as e:
+#         print(f"[ERROR] Could not read JSON: {e}")
+#         return features
+
+#     try:
+#         features['handles.nhandles'] = len(df)
+#     except Exception as e:
+#         print(f"[WARN] handles.nhandles: {e}")
+#         features['handles.nhandles'] = None
+
+#     try:
+#         pid_col = 'PID' if 'PID' in df.columns else 'Pid' if 'Pid' in df.columns else None
+#         if pid_col:
+#             handle_counts = df.groupby(pid_col).size()
+#             features['pslist.avg_handlers'] = handle_counts.mean()
+#         else:
+#             print("[WARN] No PID column found for avg_handlers calculation.")
+#             features['pslist.avg_handlers'] = None
+#     except Exception as e:
+#         print(f"[WARN] pslist.avg_handlers: {e}")
+#         features['pslist.avg_handlers'] = None
+
+#     type_keys = [
+#         ('handles.nport', 'Port'),
+#         ('handles.nfile', 'File'),
+#         ('handles.nevent', 'Event'),
+#         ('handles.ndesktop', 'Desktop'),
+#         ('handles.nkey', 'Key'),
+#         ('handles.nthread', 'Thread'),
+#         ('handles.ndirectory', 'Directory'),
+#         ('handles.nsemaphore', 'Semaphore'),
+#         ('handles.ntimer', 'Timer'),
+#         ('handles.nsection', 'Section'),
+#         ('handles.nmutant', 'Mutant'),
+#     ]
+
+#     for feat_name, handle_type in type_keys:
+#         try:
+#             if 'Type' in df.columns:
+#                 features[feat_name] = (df['Type'] == handle_type).sum()
+#             else:
+#                 print(f"[WARN] {feat_name}: 'Type' column missing.")
+#                 features[feat_name] = None
+#         except Exception as e:
+#             print(f"[WARN] {feat_name}: {e}")
+#             features[feat_name] = None
+
+#     return features
 def extract_handles_features(jsondump):
     features = {}
 
     try:
         df = pd.read_json(jsondump)
+        plugin_dict["handles.pids"] = set(df["PID"] if "PID" in df.columns else df["Pid"])  # For psxview
     except Exception as e:
         print(f"[ERROR] Could not read JSON: {e}")
         return features
@@ -126,16 +203,12 @@ def extract_handles_features(jsondump):
         ('handles.nmutant', 'Mutant'),
     ]
 
-    for feat_name, handle_type in type_keys:
+    for feature_name, object_type in type_keys:
         try:
-            if 'Type' in df.columns:
-                features[feat_name] = (df['Type'] == handle_type).sum()
-            else:
-                print(f"[WARN] {feat_name}: 'Type' column missing.")
-                features[feat_name] = None
+            features[feature_name] = (df['Type'] == object_type).sum()
         except Exception as e:
-            print(f"[WARN] {feat_name}: {e}")
-            features[feat_name] = None
+            print(f"[WARN] {feature_name}: {e}")
+            features[feature_name] = None
 
     return features
 
@@ -220,19 +293,19 @@ def extract_psxview_features(jsondump):
     return {
         'psxview.not_in_pslist': count_false('pslist'),
         'psxview.not_in_eprocess_pool': count_false('psscan'),
-        'psxview.not_in_ethread_pool': count_false('thrdproc'),
-        'psxview.not_in_pspcid_list': count_false('pspcid'),
+        # 'psxview.not_in_ethread_pool': count_false('thrdproc'),#unavailable with Volatility3
+        # 'psxview.not_in_pspcid_list': count_false('pspcid'),#unavailable with Volatility3
         'psxview.not_in_csrss_handles': count_false('csrss'),
-        'psxview.not_in_session': count_false('session'),
-        'psxview.not_in_deskthrd': count_false('deskthrd'),
+        # 'psxview.not_in_session': count_false('session'),#unavailable with Volatility3
+        # 'psxview.not_in_deskthrd': count_false('deskthrd'),#unavailable with Volatility3
 
         'psxview.not_in_pslist_false_avg': count_false('pslist') / total,
         'psxview.not_in_eprocess_pool_false_avg': count_false('psscan') / total,
-        'psxview.not_in_ethread_pool_false_avg': count_false('thrdproc') / total,
-        'psxview.not_in_pspcid_list_false_avg': count_false('pspcid') / total,
+        # 'psxview.not_in_ethread_pool_false_avg': count_false('thrdproc') / total,,#unavailable with Volatility3
+        # 'psxview.not_in_pspcid_list_false_avg': count_false('pspcid') / total,,#unavailable with Volatility3
         'psxview.not_in_csrss_handles_false_avg': count_false('csrss') / total,
-        'psxview.not_in_session_false_avg': count_false('session') / total,
-        'psxview.not_in_deskthrd_false_avg': count_false('deskthrd') / total,
+        # 'psxview.not_in_session_false_avg': count_false('session') / total,,#unavailable with Volatility3
+        # 'psxview.not_in_deskthrd_false_avg': count_false('deskthrd') / total,,#unavailable with Volatility3
     }
 
 
@@ -284,6 +357,52 @@ def extract_svcscan_features(jsondump):
         print(f"[WARN] Failed to compute svcscan.nactive: {e}")
 
     return features
+
+
+def extract_deskthrd_features(jsondump):
+    features = {}
+    try:
+        df = pd.read_json(jsondump)
+        plugin_dict["deskthrd.pids"] = set(df["PID"] if "PID" in df.columns else df["Pid"])
+    except Exception as e:
+        print(f"[ERROR] deskthrd plugin failed: {e}")
+        plugin_dict["deskthrd.pids"] = set()
+    return features
+
+def extract_psxview_approximation(plugin_dict):
+    features = {}
+
+    pslist_pids = plugin_dict.get("pslist.pids", set())
+    pool_pids = plugin_dict.get("pool.pids", set())
+    handles_pids = plugin_dict.get("handles.pids", set())
+    session_pids = plugin_dict.get("session.pids", set())
+    deskthrd_pids = plugin_dict.get("deskthrd.pids", set())
+
+    # Core mismatch counts
+    features['psxview.not_int_ethread_pool'] = len(pool_pids - pslist_pids)
+    features['psxview.not_int_pspcid_list'] = len(handles_pids - pslist_pids)
+    features['psxview.not_in_session'] = len(session_pids - pslist_pids)
+    features['psxview.not_in_deskthrd'] = len(deskthrd_pids - pslist_pids)
+
+    # "False avg" versions — average # of mismatches per pslist PID
+    try:
+        n_total = len(pslist_pids)
+        if n_total == 0:
+            raise ZeroDivisionError("No pslist PIDs to compare against")
+
+        features['psxview.not_int_ethread_pool_false_avg'] = len(pslist_pids - pool_pids) / n_total
+        features['psxview.not_int_pspcid_list_false_avg'] = len(pslist_pids - handles_pids) / n_total
+        features['psxview.not_in_session_false_avg'] = len(pslist_pids - session_pids) / n_total
+        features['psxview.not_in_deskthrd_false_avg'] = len(pslist_pids - deskthrd_pids) / n_total
+    except Exception as e:
+        print(f"[WARN] false_avg psxview features: {e}")
+        features['psxview.not_int_ethread_pool_false_avg'] = None
+        features['psxview.not_int_pspcid_list_false_avg'] = None
+        features['psxview.not_in_session_false_avg'] = None
+        features['psxview.not_in_deskthrd_false_avg'] = None
+
+    return features
+
 
 
 
@@ -342,6 +461,10 @@ def extract_all_features_from_memdump(memdump_path, CSVoutput_path, volatility_p
             vol(module, output_file_path)
             with open(output_file_path, 'r') as output:
                 features.update(extractor(output))
+    
+    psxview_features = extract_psxview_approximation(plugin_dict)
+    features.update(psxview_features)
+
     
     features_mem = {'mem.name_extn': str(memdump_path).rsplit('/', 1)[-1]}
     features_mem.update(features)
