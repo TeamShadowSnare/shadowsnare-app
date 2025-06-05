@@ -1,6 +1,6 @@
 import os
 from PyQt6.QtCore import QDate, QTime, Qt
-from utils.plot_utils import load_template
+from utils.template_loader import load_template
 
 class SummaryService:
     def generate_summary(self, total_count, benign_count, malicious_count, status):
