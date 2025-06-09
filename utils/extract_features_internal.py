@@ -23,39 +23,6 @@ from volatility3.framework.configuration import requirements
 from volatility3.plugins.windows import pslist, dlllist, handles, ldrmodules, malfind, modules, callbacks, svcscan
 
 
-# Extractor functions extracts features from the Volatility
-
-# def extract_pslist_features(jsondump):
-
-#     # df = pd.DataFrame(jsondump)
-#     df = jsondump if isinstance(jsondump, list) else json.load(jsondump)
-#     features = {}
-
-#     try:
-#         print("nproc = ",df.PPID.size)
-#         features['pslist.nproc'] = df.PPID.size
-#     except Exception as e:
-#         print(f"[WARN] pslist.nproc: {e}")
-
-#     try:
-#         features['pslist.nppid'] = df.PPID.nunique()
-#     except Exception as e:
-#         print(f"[WARN] pslist.nppid: {e}")
-
-#     try:
-#         features['pslist.avg_threads'] = df.Threads.mean()
-#     except Exception as e:
-#         print(f"[WARN] pslist.avg_threads: {e}")
-
-
-#     try:
-#         features['pslist.nprocs64bit'] = len(df[df["Wow64"] == "True"])
-#     except Exception as e:
-#         print(f"[WARN] pslist.nprocs64bit: {e}")
-
-
-#     return features
-
 def extract_pslist_features(jsondump):
     try:
         # Handle both list of dicts and DataFrame input
@@ -111,7 +78,17 @@ def extract_pslist_features(jsondump):
     try:
         # Average number of threads
         if 'Threads' in df.columns:
+            # print("printing df.Threads...")
+            # print(df['Threads'])
+            print("[DEBUG] Threads column types:")
+            print(df['Threads'].apply(lambda x: type(x)).value_counts())
+            print("[DEBUG] Threads column sample:")
+            print(df['Threads'].head())
+
+            # features['pslist.avg_threads'] = float(df['Threads'].mean())
+            df['Threads'] = pd.to_numeric(df['Threads'], errors='coerce')
             features['pslist.avg_threads'] = float(df['Threads'].mean())
+
         else:
             print("[WARN] pslist: Threads column not found")
             features['pslist.avg_threads'] = 0
@@ -325,11 +302,23 @@ def extract_ldrmodules_features(jsondump):
 
 def extract_malfind_features(jsondump):
     df = pd.DataFrame(jsondump)
+    # print("[DEBUG]: printing dataframe's CommitCharge: ")
+    # print(df.CommitCharge)
+    df['CommitCharge'] = pd.to_numeric(df['CommitCharge'], errors='coerce')
+    print("[DEBUG] CommitCharge summary stats:")
+    print(df['CommitCharge'].describe())
+    print("[DEBUG] Top CommitCharge values:")
+    print(df['CommitCharge'].sort_values(ascending=False).head())
+    print("[DEBUG] I need to pick one from: ")
+    print(f"df.CommitCharge.sum() = {df['CommitCharge'].sum()}, df.CommitCharge.mean() = {df['CommitCharge'].mean()}, and df.CommitCharge.max()={df['CommitCharge'].max()}")
+
+
     return {                                                                        
         'malfind.ninjections': df.CommitCharge.size,                              #Number of hidden code injections found by malfind
-	'malfind.commitCharge': df.CommitCharge.sum(),                            #Sum of Commit Charges over time                                
-	'malfind.protection': len(df[df["Protection"]=="PAGE_EXECUTE_READWRITE"]),#Number of injections with all permissions 
-	'malfind.uniqueInjections': df.PID.unique().size,                         #Number of unique injections
+        # 'malfind.commitCharge': df.CommitCharge.sum(),                            #Sum of Commit Charges over time                                
+        'malfind.commitCharge': df['CommitCharge'].sum(),                            #Sum of Commit Charges over time  
+        'malfind.protection': len(df[df["Protection"]=="PAGE_EXECUTE_READWRITE"]),#Number of injections with all permissions 
+        'malfind.uniqueInjections': df.PID.unique().size,                         #Number of unique injections
         # 'malfind.avgInjec_per_proc': df.PID.size/df.PID.unique().size,            #Average number of injections per process
         # 'malfind.tagsVad': len(df[df["Tag"]=="Vad"]),                             #Number of Injections tagged as Vad
         # 'malfind.tagsVads': len(df[df["Tag"]=="Vads"]),                           #Number of Injections tagged as Vads
@@ -368,39 +357,38 @@ def extract_callbacks_features(jsondump):
     return features
 
 
-#     return features
-def extract_psxview_features(jsondump):
-    psxview = json.load(jsondump)
+# def extract_psxview_features(jsondump):
+#     psxview = json.load(jsondump)
 
-    # Auto-diagnostic for missing expected keys
-    expected_keys = ['pslist', 'psscan', 'csrss', 'pspcid', 'session', 'deskthrd', 'thrdproc']
-    for k in expected_keys:
-        missing = [p for p in psxview if k not in p or p[k] is None]
-        if missing:
-            print(f"[INFO] Missing key: {k} in {len(missing)} / {len(psxview)} entries")
+#     # Auto-diagnostic for missing expected keys
+#     expected_keys = ['pslist', 'psscan', 'csrss', 'pspcid', 'session', 'deskthrd', 'thrdproc']
+#     for k in expected_keys:
+#         missing = [p for p in psxview if k not in p or p[k] is None]
+#         if missing:
+#             print(f"[INFO] Missing key: {k} in {len(missing)} / {len(psxview)} entries")
 
-    def count_false(key):
-        return sum(1 for p in psxview if str(p.get(key, True)) == 'False')
+#     def count_false(key):
+#         return sum(1 for p in psxview if str(p.get(key, True)) == 'False')
 
-    total = len(psxview) if psxview else 1  # prevent division by zero
+#     total = len(psxview) if psxview else 1  # prevent division by zero
 
-    return {
-        'psxview.not_in_pslist': count_false('pslist'),
-        'psxview.not_in_eprocess_pool': count_false('psscan'),
-        'psxview.not_in_ethread_pool': count_false('thrdproc'),
-        'psxview.not_in_pspcid_list': count_false('pspcid'),
-        'psxview.not_in_csrss_handles': count_false('csrss'),
-        'psxview.not_in_session': count_false('session'),
-        'psxview.not_in_deskthrd': count_false('deskthrd'),
+#     return {
+#         'psxview.not_in_pslist': count_false('pslist'),
+#         'psxview.not_in_eprocess_pool': count_false('psscan'),
+#         'psxview.not_in_ethread_pool': count_false('thrdproc'),
+#         'psxview.not_in_pspcid_list': count_false('pspcid'),
+#         'psxview.not_in_csrss_handles': count_false('csrss'),
+#         'psxview.not_in_session': count_false('session'),
+#         'psxview.not_in_deskthrd': count_false('deskthrd'),
 
-        'psxview.not_in_pslist_false_avg': count_false('pslist') / total,
-        'psxview.not_in_eprocess_pool_false_avg': count_false('psscan') / total,
-        'psxview.not_in_ethread_pool_false_avg': count_false('thrdproc') / total,
-        'psxview.not_in_pspcid_list_false_avg': count_false('pspcid') / total,
-        'psxview.not_in_csrss_handles_false_avg': count_false('csrss') / total,
-        'psxview.not_in_session_false_avg': count_false('session') / total,
-        'psxview.not_in_deskthrd_false_avg': count_false('deskthrd') / total,
-    }
+#         'psxview.not_in_pslist_false_avg': count_false('pslist') / total,
+#         'psxview.not_in_eprocess_pool_false_avg': count_false('psscan') / total,
+#         'psxview.not_in_ethread_pool_false_avg': count_false('thrdproc') / total,
+#         'psxview.not_in_pspcid_list_false_avg': count_false('pspcid') / total,
+#         'psxview.not_in_csrss_handles_false_avg': count_false('csrss') / total,
+#         'psxview.not_in_session_false_avg': count_false('session') / total,
+#         'psxview.not_in_deskthrd_false_avg': count_false('deskthrd') / total,
+#     }
 
 
 
