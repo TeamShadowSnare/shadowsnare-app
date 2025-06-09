@@ -11,7 +11,7 @@ class HomeView(QWidget):
         layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
 
         # Logo
-        logo_path = os.path.join("assets", "logo.png")  # Path to logo
+        logo_path = os.path.join("assets", "logo.png")  
         logo_label = QLabel()
         logo_pixmap = QPixmap(logo_path)
 
