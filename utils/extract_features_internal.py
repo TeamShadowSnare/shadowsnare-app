@@ -1,11 +1,11 @@
 import argparse
 import csv
-import functools
-import json
-import subprocess
-import tempfile
+# import functools
+# import json
+# import subprocess
+# import tempfile
 import os
-import io
+# import io
 import pandas as pd
 import traceback
 
@@ -20,19 +20,23 @@ from volatility3.framework import contexts, exceptions
 from volatility3.framework.automagic import stacker, linux, windows
 from volatility3.framework.configuration import requirements
 
+from volatility3.framework import contexts, interfaces, exceptions
+from volatility3.framework import automagic, constants, plugins
+from volatility3 import plugins as vol_plugins
+from volatility3.cli import text_renderer
+import urllib.request
+import urllib.parse
+
 from volatility3.plugins.windows import pslist, dlllist, handles, ldrmodules, malfind, modules, callbacks, svcscan
+
 
 
 def extract_pslist_features(jsondump):
     try:
         # Handle both list of dicts and DataFrame input
-        if isinstance(jsondump, list):
-            df = pd.DataFrame(jsondump)
-        else:
-            df = pd.DataFrame(jsondump)
-            
-        print(f"[DEBUG] pslist DataFrame shape: {df.shape}")
-        print(f"[DEBUG] pslist columns: {df.columns.tolist()}")
+        df = pd.DataFrame(jsondump)
+        # print(f"[DEBUG] pslist DataFrame shape: {df.shape}")
+        # print(f"[DEBUG] pslist columns: {df.columns.tolist()}")
         if not df.empty:
             print(f"[DEBUG] pslist first few rows:\n{df.head()}")
             
@@ -55,7 +59,7 @@ def extract_pslist_features(jsondump):
         # Number of processes
         if 'PPID' in df.columns:
             features['pslist.nproc'] = len(df)
-            print(f"[DEBUG] pslist.nproc = {len(df)}")
+            # print(f"[DEBUG] pslist.nproc = {len(df)}")
         else:
             print("[WARN] pslist: PPID column not found, using row count")
             features['pslist.nproc'] = len(df)
@@ -80,10 +84,11 @@ def extract_pslist_features(jsondump):
         if 'Threads' in df.columns:
             # print("printing df.Threads...")
             # print(df['Threads'])
-            print("[DEBUG] Threads column types:")
-            print(df['Threads'].apply(lambda x: type(x)).value_counts())
-            print("[DEBUG] Threads column sample:")
-            print(df['Threads'].head())
+
+            # print("[DEBUG] Threads column types:")
+            # print(df['Threads'].apply(lambda x: type(x)).value_counts())
+            # print("[DEBUG] Threads column sample:")
+            # print(df['Threads'].head())
 
             # features['pslist.avg_threads'] = float(df['Threads'].mean())
             df['Threads'] = pd.to_numeric(df['Threads'], errors='coerce')
@@ -141,7 +146,7 @@ def extract_dlllist_features(jsondump):
     return{
         'dlllist.ndlls': a,
         # 'dlllist.nproc_dll': b,#Not part of our dataset
-        'dlllist.avg_dllPerProc': c,
+        'dlllist.avg_dlls_per_proc': c,
         # 'dlllist.avgSize': d,#Not part of our dataset
         # 'dlllist.outfile': e#Not part of our dataset
     }
@@ -166,13 +171,13 @@ def extract_handles_features(jsondump):
         pid_col = 'PID' if 'PID' in df.columns else 'Pid' if 'Pid' in df.columns else None
         if pid_col:
             handle_counts = df.groupby(pid_col).size()
-            features['pslist.avg_handlers'] = handle_counts.mean()
+            features['handles.avg_handles_per_proc'] = handle_counts.mean()
         else:
-            print("[WARN] No PID column found for avg_handlers calculation.")
-            features['pslist.avg_handlers'] = None
+            print("[WARN] No PID column found for avg_handles_per_proc calculation.")
+            features['handles.avg_handles_per_proc'] = None
     except Exception as e:
-        print(f"[WARN] pslist.avg_handlers: {e}")
-        features['pslist.avg_handlers'] = None
+        print(f"[WARN] handles.avg_handles_per_proc: {e}")
+        features['handles.avg_handles_per_proc'] = None
 
     type_keys = [
         ('handles.nport', 'Port'),
@@ -204,23 +209,12 @@ def extract_handles_features(jsondump):
 
 
 
-# def extract_ldrmodules_features(jsondump):
-#     df = pd.DataFrame(jsondump)
-#     return {
-#         # 'ldrmodules.total': df.Base.size,                                       #Number of total modules
-#         'ldrmodules.not_in_load': len(df[df["InLoad"]==False]),                 #Number of modules missing from load list
-#         'ldrmodules.not_in_init': len(df[df["InInit"]==False]),                 #Number of modules missing from init list
-#         'ldrmodules.not_in_mem': len(df[df["InMem"]==False]),                   #Number of modules missing from mem list
-# 	# 'ldrmodules.nporc': df.Pid.unique().size,                               #Number of processes with modules in memory
-#         'ldrmodules.not_in_load_avg': len(df[df["InLoad"]==False])/df.Base.size,#Avg number of modules missing from load list
-#         'ldrmodules.not_in_init_avg': len(df[df["InInit"]==False])/df.Base.size,#Avg number of modules missing from init list
-#         'ldrmodules.not_in_mem_avg': len(df[df["InMem"]==False])/df.Base.size,  #Avg number of modules missing from mem list
-#     }
+
 def extract_ldrmodules_features(jsondump):
     try:
         df = pd.DataFrame(jsondump)
-        print(f"[DEBUG] ldrmodules DataFrame shape: {df.shape}")
-        print(f"[DEBUG] ldrmodules columns: {df.columns.tolist()}")
+        # print(f"[DEBUG] ldrmodules DataFrame shape: {df.shape}")
+        # print(f"[DEBUG] ldrmodules columns: {df.columns.tolist()}")
         if not df.empty:
             print(f"[DEBUG] ldrmodules first few rows:\n{df.head()}")
     except Exception as e:
@@ -305,16 +299,16 @@ def extract_malfind_features(jsondump):
     # print("[DEBUG]: printing dataframe's CommitCharge: ")
     # print(df.CommitCharge)
     df['CommitCharge'] = pd.to_numeric(df['CommitCharge'], errors='coerce')
-    print("[DEBUG] CommitCharge summary stats:")
-    print(df['CommitCharge'].describe())
-    print("[DEBUG] Top CommitCharge values:")
-    print(df['CommitCharge'].sort_values(ascending=False).head())
-    print("[DEBUG] I need to pick one from: ")
-    print(f"df.CommitCharge.sum() = {df['CommitCharge'].sum()}, df.CommitCharge.mean() = {df['CommitCharge'].mean()}, and df.CommitCharge.max()={df['CommitCharge'].max()}")
+    # print("[DEBUG] CommitCharge summary stats:")
+    # print(df['CommitCharge'].describe())
+    # print("[DEBUG] Top CommitCharge values:")
+    # print(df['CommitCharge'].sort_values(ascending=False).head())
+    # print("[DEBUG] I need to pick one from: ")
+    # print(f"df.CommitCharge.sum() = {df['CommitCharge'].sum()}, df.CommitCharge.mean() = {df['CommitCharge'].mean()}, and df.CommitCharge.max()={df['CommitCharge'].max()}")
 
 
     return {                                                                        
-        'malfind.ninjections': df.CommitCharge.size,                              #Number of hidden code injections found by malfind
+        'malfind.ninjections': df['CommitCharge'].size,                              #Number of hidden code injections found by malfind
         # 'malfind.commitCharge': df.CommitCharge.sum(),                            #Sum of Commit Charges over time                                
         'malfind.commitCharge': df['CommitCharge'].sum(),                            #Sum of Commit Charges over time  
         'malfind.protection': len(df[df["Protection"]=="PAGE_EXECUTE_READWRITE"]),#Number of injections with all permissions 
@@ -355,41 +349,6 @@ def extract_callbacks_features(jsondump):
         print(f"[WARN] Failed to compute callbacks.ngeneric: {e}")
 
     return features
-
-
-# def extract_psxview_features(jsondump):
-#     psxview = json.load(jsondump)
-
-#     # Auto-diagnostic for missing expected keys
-#     expected_keys = ['pslist', 'psscan', 'csrss', 'pspcid', 'session', 'deskthrd', 'thrdproc']
-#     for k in expected_keys:
-#         missing = [p for p in psxview if k not in p or p[k] is None]
-#         if missing:
-#             print(f"[INFO] Missing key: {k} in {len(missing)} / {len(psxview)} entries")
-
-#     def count_false(key):
-#         return sum(1 for p in psxview if str(p.get(key, True)) == 'False')
-
-#     total = len(psxview) if psxview else 1  # prevent division by zero
-
-#     return {
-#         'psxview.not_in_pslist': count_false('pslist'),
-#         'psxview.not_in_eprocess_pool': count_false('psscan'),
-#         'psxview.not_in_ethread_pool': count_false('thrdproc'),
-#         'psxview.not_in_pspcid_list': count_false('pspcid'),
-#         'psxview.not_in_csrss_handles': count_false('csrss'),
-#         'psxview.not_in_session': count_false('session'),
-#         'psxview.not_in_deskthrd': count_false('deskthrd'),
-
-#         'psxview.not_in_pslist_false_avg': count_false('pslist') / total,
-#         'psxview.not_in_eprocess_pool_false_avg': count_false('psscan') / total,
-#         'psxview.not_in_ethread_pool_false_avg': count_false('thrdproc') / total,
-#         'psxview.not_in_pspcid_list_false_avg': count_false('pspcid') / total,
-#         'psxview.not_in_csrss_handles_false_avg': count_false('csrss') / total,
-#         'psxview.not_in_session_false_avg': count_false('session') / total,
-#         'psxview.not_in_deskthrd_false_avg': count_false('deskthrd') / total,
-#     }
-
 
 
 def extract_svcscan_features(jsondata):
@@ -437,6 +396,39 @@ def extract_svcscan_features(jsondata):
 
     return features
 
+# def extract_psxview_features(jsondump):
+#     psxview = json.load(jsondump)
+
+#     # Auto-diagnostic for missing expected keys
+#     expected_keys = ['pslist', 'psscan', 'csrss', 'pspcid', 'session', 'deskthrd', 'thrdproc']
+#     for k in expected_keys:
+#         missing = [p for p in psxview if k not in p or p[k] is None]
+#         if missing:
+#             print(f"[INFO] Missing key: {k} in {len(missing)} / {len(psxview)} entries")
+
+#     def count_false(key):
+#         return sum(1 for p in psxview if str(p.get(key, True)) == 'False')
+
+#     total = len(psxview) if psxview else 1  # prevent division by zero
+
+#     return {
+#         'psxview.not_in_pslist': count_false('pslist'),
+#         'psxview.not_in_eprocess_pool': count_false('psscan'),
+#         'psxview.not_in_ethread_pool': count_false('thrdproc'),
+#         'psxview.not_in_pspcid_list': count_false('pspcid'),
+#         'psxview.not_in_csrss_handles': count_false('csrss'),
+#         'psxview.not_in_session': count_false('session'),
+#         'psxview.not_in_deskthrd': count_false('deskthrd'),
+
+#         'psxview.not_in_pslist_false_avg': count_false('pslist') / total,
+#         'psxview.not_in_eprocess_pool_false_avg': count_false('psscan') / total,
+#         'psxview.not_in_ethread_pool_false_avg': count_false('thrdproc') / total,
+#         'psxview.not_in_pspcid_list_false_avg': count_false('pspcid') / total,
+#         'psxview.not_in_csrss_handles_false_avg': count_false('csrss') / total,
+#         'psxview.not_in_session_false_avg': count_false('session') / total,
+#         'psxview.not_in_deskthrd_false_avg': count_false('deskthrd') / total,
+#     }
+
 
 VOL_MODULES = {
     'pslist.PsList': extract_pslist_features,
@@ -450,14 +442,7 @@ VOL_MODULES = {
     # 'psxview.PsXView':extract_psxview_features
 }
 
-def invoke_volatility3(memdump_path, full_module_name):
-    from volatility3.framework import contexts, interfaces, exceptions
-    from volatility3.framework import automagic, constants, plugins
-    from volatility3 import plugins as vol_plugins
-    from volatility3.cli import text_renderer
-    import urllib.request
-    import urllib.parse
-    
+def invoke_volatility3(memdump_path, full_module_name):    
     # Create a proper FileHandler class that implements all required methods
     class LocalFileHandler(interfaces.plugins.FileHandlerInterface):
         """File handler for local files"""
