@@ -171,13 +171,13 @@ def extract_handles_features(jsondump):
         pid_col = 'PID' if 'PID' in df.columns else 'Pid' if 'Pid' in df.columns else None
         if pid_col:
             handle_counts = df.groupby(pid_col).size()
-            features['handles.avg_handles_per_proc'] = handle_counts.mean()
+            features['pslist.avg_handlers'] = handle_counts.mean()
         else:
             print("[WARN] No PID column found for avg_handles_per_proc calculation.")
-            features['handles.avg_handles_per_proc'] = None
+            features['pslist.avg_handlers'] = None
     except Exception as e:
         print(f"[WARN] handles.avg_handles_per_proc: {e}")
-        features['handles.avg_handles_per_proc'] = None
+        features['pslist.avg_handlers'] = None
 
     type_keys = [
         ('handles.nport', 'Port'),

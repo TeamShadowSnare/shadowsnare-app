@@ -34,6 +34,7 @@
 
 
 import shap
+import pandas as pd
 
 class ExplainabilityService:
     def __init__(self):
@@ -42,13 +43,31 @@ class ExplainabilityService:
 
     def initialize_explainer(self, model, X_train, feature_names):
         self.feature_names = feature_names
-        self.explainer = shap.Explainer(model, X_train[feature_names])
+        
+        # Ensure X_train is a DataFrame for proper column selection
+        if not isinstance(X_train, pd.DataFrame):
+            X_train = pd.DataFrame(X_train, columns=feature_names)
+        
+        # Use the actual Keras model, not the wrapper
+        # If model is MalwareDetector, get the underlying Keras model
+        if hasattr(model, 'model'):
+            keras_model = model.model
+        else:
+            keras_model = model
+            
+        # Create SHAP explainer with the training data
+        self.explainer = shap.Explainer(keras_model, X_train[feature_names])
 
     def generate_explanation_for_sample(self, X_df, sample_series, index=None):
         if self.explainer is None:
             return "SHAP explainer not initialized."
 
-        sample = sample_series.values.reshape(1, -1)
+        # Handle both array and series input
+        if hasattr(sample_series, 'values'):
+            sample = sample_series.values.reshape(1, -1)
+        else:
+            sample = sample_series.reshape(1, -1)
+            
         shap_values = self.explainer(sample)
         values = shap_values[0].values
 
