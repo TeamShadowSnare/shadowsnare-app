@@ -90,10 +90,10 @@ class UserModeController:
             self.explainer = ExplainabilityService()
 
             # Use the feature names from the model's selected features, not from numeric_df
-            model_feature_names = self.predictor.selected_features
+            model_feature_names = self.predictor.model.selected_features
 
             self.explainer.initialize_explainer(
-                model=self.predictor,  # Pass the MalwareDetector object
+                model=self.predictor.model,  # Pass the MalwareDetector object
                 X_train=used_features,  # This should be a DataFrame
                 feature_names=model_feature_names  # Use model's feature names
             )
@@ -102,7 +102,7 @@ class UserModeController:
                 # Get the row as a pandas Series for proper handling
                 sample = used_features.iloc[idx]
                 shap_text = self.explainer.generate_explanation_for_sample(used_features, sample, idx)
-                self.view.append_shap_explanation(idx + 1, shap_text)
+                # self.view.append_shap_explanation(idx + 1, shap_text)
                 
         except Exception as e:
             print(f"[DEBUG]: {e}")
