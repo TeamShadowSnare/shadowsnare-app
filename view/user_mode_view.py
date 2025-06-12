@@ -89,15 +89,13 @@ class UserMode(QWidget):
         self.summary_layout.addWidget(self.data_display)
         self.analysis_layout.addWidget(self.summary_container)
 
-        # SHAP Explanation area (middle box)
+        # SHAP explanation text (only for popup, NOT shown in main layout)
         self.explanation_text_edit = QTextEdit()
         self.explanation_text_edit.setReadOnly(True)
-        self.analysis_layout.addWidget(self.explanation_text_edit)
 
-        # # Raw data display (bottom box)
-        # self.data_text_edit = QTextEdit()
-        # self.data_text_edit.setReadOnly(True)
-        # self.analysis_layout.addWidget(self.data_text_edit)
+        # Raw CSV data text (optional — not shown in layout)
+        self.data_text_edit = QTextEdit()
+        self.data_text_edit.setReadOnly(True)
 
         # SHAP popup
         self.setup_explanation_popup()

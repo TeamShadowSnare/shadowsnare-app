@@ -27,10 +27,34 @@ class CSVUploaderView(QWidget):
         self.left_layout.addLayout(self.upload_process_layout)
 
         self.upload_button = QPushButton("Upload CSV")
+        self.upload_button.setStyleSheet("""
+            QPushButton {
+                background-color: #3498db;   /* Blue */
+                color: white;
+                font-size: 18px;
+                border-radius: 8px;
+                padding: 8px 20px;
+            }
+            QPushButton:hover {
+                background-color: #217dbb;   /* Darker blue */
+            }
+        """)
         self.upload_process_layout.addWidget(self.upload_button)
 
         self.process_button = QPushButton("Process CSV")
         self.process_button.setVisible(False)
+        self.process_button.setStyleSheet("""
+            QPushButton {
+                background-color: #e74c3c;   /* Red */
+                color: white;
+                font-size: 18px;
+                border-radius: 8px;
+                padding: 8px 20px;
+            }
+            QPushButton:hover {
+                background-color: #c0392b;   /* Darker red */
+            }
+        """)
         self.upload_process_layout.addWidget(self.process_button)
 
         self.left_layout.addItem(QSpacerItem(20, 40, QSizePolicy.Policy.Minimum, QSizePolicy.Policy.Expanding))

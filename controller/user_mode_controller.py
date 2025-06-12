@@ -11,19 +11,21 @@ import ctypes
 import sys
 import subprocess
 from utils.run_as_admin import run_as_admin
+from model.malware_model import MalwareDetector
 
 class UserModeController:
     def __init__(self, view):
         self.view = view
         self.view.setup_connections(self)
 
-        self.predictor = PredictionService()
-        self.explainer = None
+        self.model = MalwareDetector()
+        self.explainer = ExplainabilityService()
         self.summarizer = SummaryService()
+        self.predictor = PredictionService()
 
         self.data = None
+        self.feature_names = []
         self.feature_data = None
-        self.feature_names = None
 
     def handle_upload_memory_file(self):
         file_path, _ = QFileDialog.getOpenFileName(
@@ -179,52 +181,61 @@ class UserModeController:
 
     def handle_upload_csv_directly(self):
         file_path, _ = QFileDialog.getOpenFileName(self.view, "Select CSV file", "", "CSV Files (*.csv)")
+        print(f"📂 File selected: {file_path}")  # Debug line
+
         if not file_path:
+            print("🚫 No file selected.")
             return
 
         try:
-            # Load CSV
             self.data = pd.read_csv(file_path)
+            print("✅ CSV loaded.")
 
-            # Extract features names, skipping label if exists
-            self.feature_names = list(self.data.columns[1:])  # assuming the first column is a label or ID
-
-            # Format data for display
+            self.feature_names = list(self.data.columns[1:])
             formatted_data = "\n\n".join([
                 f"Dump file {i+1}:\n" + ", ".join(map(str, row[1:]))
                 for i, row in self.data.iterrows()
             ])
-            self.view.data_text_edit.setText(formatted_data)
+            print("📄 Data displayed.")
 
-            # Perform prediction
             probabilities, binary_preds, labels, features_df = self.model.predict(self.data)
+            print("🔮 Prediction complete.")
 
             benign_count = (binary_preds == 0).sum()
             malicious_count = (binary_preds == 1).sum()
             total_count = len(binary_preds)
             status = "Potential Malware Detected" if malicious_count > 0 else "Device Clean"
+            summary_html = self.summarizer.generate_summary(
+                total_count, benign_count, malicious_count, status
+            )
 
-            # Generate summary
-            summary_html = self.summarizer.generate_summary(total_count, benign_count, malicious_count, status)
+            # Append a clickable link to show SHAP explanation
+            summary_html += """
+                <div style='text-align:center; margin-top: 20px;'>
+                    <a href='#' style='font-size:18px; color:#00bcd4;'>🔍 Click here to view explanation</a>
+                </div>
+            """
+
             self.view.data_display.setHtml(summary_html)
 
-            # Initialize SHAP explainer
             self.explainer.initialize_explainer(self.model.model, features_df, self.model.selected_features)
-
-            # Generate SHAP explanations for malicious samples
-            malicious_indices = (binary_preds == 1).nonzero()[0]
-            for idx in malicious_indices:
+            for idx in (binary_preds == 1).nonzero()[0]:
                 sample = features_df.iloc[idx]
                 shap_text = self.explainer.generate_explanation_for_sample(features_df, sample, idx)
                 self.view.append_shap_explanation(idx + 1, shap_text)
 
-            self.view.tab_widget.setVisible(True)
-            self.view.process_button.setVisible(True)
+            self.view.analysis_widget.setVisible(True)
+            print("✅ Done.")
 
         except Exception as e:
+            print(f"❌ Error: {e}")
             self.view.data_display.setText(f"Error processing CSV file: {e}")
-            self.view.tab_widget.setVisible(False)
 
+        self.view.title.setVisible(False)
+        self.view.instructions.setVisible(False)
+        self.view.create_dump_button.setVisible(False)
+        self.view.extract_csv_button.setVisible(False)
+        self.view.upload_csv_button.setVisible(False)
 
 # import os
 # import numpy as np
