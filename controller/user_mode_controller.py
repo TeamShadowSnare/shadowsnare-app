@@ -9,6 +9,7 @@ from services.memory_dump_service import extract_features_and_convert_to_csv
 import traceback
 from utils.analysis_worker import AnalysisWorker
 from PyQt6.QtCore import QThread
+from PyQt6.QtWidgets import QApplication
 
 
 class UserModeController:
@@ -125,6 +126,7 @@ class UserModeController:
 
         self.thread = QThread()
         self.worker = AnalysisWorker(memory_path, output_dir, self.predictor, self.summarizer)
+        self.worker.progress.connect(self.on_progress_update)
         self.worker.moveToThread(self.thread)
 
         self.thread.started.connect(self.worker.run)
@@ -136,6 +138,11 @@ class UserModeController:
         self.thread.finished.connect(self.thread.deleteLater)
 
         self.thread.start()
+        
+    def on_progress_update(self, message):
+        self.view.data_display.append(message)
+        self.view.data_display.repaint()
+        QApplication.processEvents()
 
     def on_analysis_finished(self, summary_html, explanation_text):
         self.view.show_result(summary_html)

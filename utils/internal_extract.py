@@ -543,19 +543,37 @@ def write_dict_to_csv(filename, dictionary):
         writer.writerow(dictionary)
 
 
-def extract_all_features_from_memdump(memdump_path, output_path):
+#def extract_all_features_from_memdump(memdump_path, output_path):
+def extract_all_features_from_memdump(memdump_path, output_path, progress_callback=None):
+
     features = {}
     print(f'=> Extracting features from {memdump_path}')
     print(f'=> Outputting to {output_path}')
 
+    # for module, extractor in VOL_MODULES.items():
+    #     print(f"=> Running Volatility module: {module}")
+    #     try:
+    #         json_output = invoke_volatility3(memdump_path, module)
+    #         features.update(extractor(json_output))
+    #     except Exception as e:
+    #         print(f"[ERROR] {module} failed: {e}")
+    #         traceback.print_exc()
+
     for module, extractor in VOL_MODULES.items():
-        print(f"=> Running Volatility module: {module}")
+        if progress_callback:
+            progress_callback.emit(f"🧩 Running plugin: {module}...")
         try:
             json_output = invoke_volatility3(memdump_path, module)
             features.update(extractor(json_output))
+            if progress_callback:
+                progress_callback.emit(f"✅ Finished plugin: {module}")
         except Exception as e:
-            print(f"[ERROR] {module} failed: {e}")
+            msg = f"❌ Error running {module}: {e}"
+            print(msg)
+            if progress_callback:
+                progress_callback.emit(msg)
             traceback.print_exc()
+
 
     features["mem.name_extn"] = os.path.basename(memdump_path)
     output_csv_path = os.path.join(output_path, "output.csv")
