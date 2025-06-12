@@ -27,7 +27,7 @@ from volatility3.cli import text_renderer
 import urllib.request
 import urllib.parse
 
-from volatility3.plugins.windows import pslist, dlllist, handles, ldrmodules, malfind, modules, callbacks, svcscan
+from volatility3.plugins.windows import pslist, dlllist, handles, ldrmodules, malfind, modules, callbacks, svcscan, psxview
 
 
 
@@ -428,6 +428,32 @@ def extract_svcscan_features(jsondata):
 #         'psxview.not_in_session_false_avg': count_false('session') / total,
 #         'psxview.not_in_deskthrd_false_avg': count_false('deskthrd') / total,
 #     }
+def get_available_psxview_features(psxview):
+    keys_present = set()
+    for entry in psxview:
+        keys_present.update(entry.keys())
+    # Remove non-boolean columns if necessary (like PID or name)
+    keys_present.discard('PID')  # or 'pid', 'offset', etc., depending on your data
+    return sorted(keys_present)
+
+def extract_psxview_features(psxview):
+    #print(get_available_psxview_features(psxview=psxview))
+    total = len(psxview) if psxview else 1  # prevent division by zero
+
+    def count_false(key):
+        return sum(1 for p in psxview if str(p.get(key, True)) == 'False')
+
+    return {
+        'psxview.not_in_pslist': count_false('pslist'),
+        'psxview.not_in_eprocess_pool': count_false('psscan'),
+        'psxview.not_in_csrss_handles': count_false('csrss'),
+
+        'psxview.not_in_pslist_false_avg': count_false('pslist') / total,
+        'psxview.not_in_eprocess_pool_false_avg': count_false('psscan') / total,
+        'psxview.not_in_csrss_handles_false_avg': count_false('csrss') / total,
+    }
+
+
 
 
 VOL_MODULES = {
@@ -439,7 +465,7 @@ VOL_MODULES = {
     'modules.Modules': extract_modules_features,
     'callbacks.Callbacks': extract_callbacks_features,
     'svcscan.SvcScan': extract_svcscan_features,
-    # 'psxview.PsXView':extract_psxview_features
+    'psxview.PsXView':extract_psxview_features
 }
 
 def invoke_volatility3(memdump_path, full_module_name):    
