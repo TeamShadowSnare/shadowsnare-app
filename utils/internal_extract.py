@@ -27,7 +27,7 @@ from volatility3.cli import text_renderer
 import urllib.request
 import urllib.parse
 
-from volatility3.plugins.windows import pslist, dlllist, handles, ldrmodules, malfind, modules, callbacks, svcscan
+from volatility3.plugins.windows import pslist, dlllist, handles, ldrmodules, malfind, modules, callbacks, svcscan, psxview
 
 
 
@@ -428,6 +428,32 @@ def extract_svcscan_features(jsondata):
 #         'psxview.not_in_session_false_avg': count_false('session') / total,
 #         'psxview.not_in_deskthrd_false_avg': count_false('deskthrd') / total,
 #     }
+def get_available_psxview_features(psxview):
+    keys_present = set()
+    for entry in psxview:
+        keys_present.update(entry.keys())
+    # Remove non-boolean columns if necessary (like PID or name)
+    keys_present.discard('PID')  # or 'pid', 'offset', etc., depending on your data
+    return sorted(keys_present)
+
+def extract_psxview_features(psxview):
+    #print(get_available_psxview_features(psxview=psxview))
+    total = len(psxview) if psxview else 1  # prevent division by zero
+
+    def count_false(key):
+        return sum(1 for p in psxview if str(p.get(key, True)) == 'False')
+
+    return {
+        'psxview.not_in_pslist': count_false('pslist'),
+        'psxview.not_in_eprocess_pool': count_false('psscan'),
+        'psxview.not_in_csrss_handles': count_false('csrss'),
+
+        'psxview.not_in_pslist_false_avg': count_false('pslist') / total,
+        'psxview.not_in_eprocess_pool_false_avg': count_false('psscan') / total,
+        'psxview.not_in_csrss_handles_false_avg': count_false('csrss') / total,
+    }
+
+
 
 
 VOL_MODULES = {
@@ -439,7 +465,7 @@ VOL_MODULES = {
     'modules.Modules': extract_modules_features,
     'callbacks.Callbacks': extract_callbacks_features,
     'svcscan.SvcScan': extract_svcscan_features,
-    # 'psxview.PsXView':extract_psxview_features
+    'psxview.PsXView':extract_psxview_features
 }
 
 def invoke_volatility3(memdump_path, full_module_name):    
@@ -543,19 +569,37 @@ def write_dict_to_csv(filename, dictionary):
         writer.writerow(dictionary)
 
 
-def extract_all_features_from_memdump(memdump_path, output_path):
+#def extract_all_features_from_memdump(memdump_path, output_path):
+def extract_all_features_from_memdump(memdump_path, output_path, progress_callback=None):
+
     features = {}
     print(f'=> Extracting features from {memdump_path}')
     print(f'=> Outputting to {output_path}')
 
+    # for module, extractor in VOL_MODULES.items():
+    #     print(f"=> Running Volatility module: {module}")
+    #     try:
+    #         json_output = invoke_volatility3(memdump_path, module)
+    #         features.update(extractor(json_output))
+    #     except Exception as e:
+    #         print(f"[ERROR] {module} failed: {e}")
+    #         traceback.print_exc()
+
     for module, extractor in VOL_MODULES.items():
-        print(f"=> Running Volatility module: {module}")
+        if progress_callback:
+            progress_callback.emit(f"🧩 Running plugin: {module}...")
         try:
             json_output = invoke_volatility3(memdump_path, module)
             features.update(extractor(json_output))
+            if progress_callback:
+                progress_callback.emit(f"✅ Finished plugin: {module}")
         except Exception as e:
-            print(f"[ERROR] {module} failed: {e}")
+            msg = f"❌ Error running {module}: {e}"
+            print(msg)
+            if progress_callback:
+                progress_callback.emit(msg)
             traceback.print_exc()
+
 
     features["mem.name_extn"] = os.path.basename(memdump_path)
     output_csv_path = os.path.join(output_path, "output.csv")
