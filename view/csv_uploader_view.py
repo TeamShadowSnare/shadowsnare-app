@@ -20,17 +20,41 @@ class CSVUploaderView(QWidget):
         self.left_widget.setLayout(self.left_layout)
         self.splitter.addWidget(self.left_widget)
 
-        self.label = QLabel("Malware Process Detection")
+        self.label = QLabel("Malware Dump File Detection")
         self.left_layout.addWidget(self.label, alignment=Qt.AlignmentFlag.AlignCenter)
 
         self.upload_process_layout = QHBoxLayout()
         self.left_layout.addLayout(self.upload_process_layout)
 
         self.upload_button = QPushButton("Upload CSV")
+        self.upload_button.setStyleSheet("""
+            QPushButton {
+                background-color: #3498db;   /* Blue */
+                color: white;
+                font-size: 18px;
+                border-radius: 8px;
+                padding: 8px 20px;
+            }
+            QPushButton:hover {
+                background-color: #217dbb;   /* Darker blue */
+            }
+        """)
         self.upload_process_layout.addWidget(self.upload_button)
 
         self.process_button = QPushButton("Process CSV")
         self.process_button.setVisible(False)
+        self.process_button.setStyleSheet("""
+            QPushButton {
+                background-color: #e74c3c;   /* Red */
+                color: white;
+                font-size: 18px;
+                border-radius: 8px;
+                padding: 8px 20px;
+            }
+            QPushButton:hover {
+                background-color: #c0392b;   /* Darker red */
+            }
+        """)
         self.upload_process_layout.addWidget(self.process_button)
 
         self.left_layout.addItem(QSpacerItem(20, 40, QSizePolicy.Policy.Minimum, QSizePolicy.Policy.Expanding))
@@ -91,7 +115,7 @@ class CSVUploaderView(QWidget):
 
     # New view methods for the refactored controller
     def show_data_preview(self, data):
-        text = "\n\n".join([f"Process {i+1}:\n" + ", ".join(row) for i, row in enumerate(data[:, 2:])])
+        text = "\n\n".join([f"Dump file {i+1}:\n" + ", ".join(row) for i, row in enumerate(data[:, 2:])])
         self.data_text_edit.setText(text)
         self.process_button.setVisible(True)
 
@@ -120,6 +144,6 @@ class CSVUploaderView(QWidget):
 
     def append_shap_explanation(self, process_index: int, text: str):
         current = self.explanation_text_edit.toPlainText()
-        new_text = f"🔍 Process {process_index} Explanation:\n{text}\n\n"
+        new_text = f"🔍 Dump file {process_index} Explanation:\n{text}\n\n"
         self.explanation_text_edit.setPlainText(current + new_text)
 

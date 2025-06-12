@@ -136,7 +136,7 @@ class CSVUploaderController:
                 self.feature_names = list(self.data.columns[1:])  # Skip label
 
                 formatted_data = "\n\n".join([
-                    f"Process {i+1}:\n" + ", ".join(map(str, row[1:]))
+                    f"Dump file {i+1}:\n" + ", ".join(map(str, row[1:]))
                     for i, row in self.data.iterrows()
                 ])
                 self.view.data_text_edit.setText(formatted_data)
@@ -178,7 +178,7 @@ class CSVUploaderController:
         self.view.confusion_graphics_scene.clear()
 
         formatted_data = "\n\n".join([
-            f"Process {i+1}:\n" + ", ".join(map(str, row[1:]))
+            f"Dump file {i+1}:\n" + ", ".join(map(str, row[1:]))
             for i, row in self.data.iterrows()
         ])
         self.view.data_text_edit.setText(formatted_data)

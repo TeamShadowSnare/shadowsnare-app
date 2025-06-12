@@ -96,5 +96,5 @@ class PlotService:
             process_number = idx + 1
             true_label = "Malware" if y_test[idx] == 1 else "Benign"
             pred_label = "Malware" if y_pred[idx] == 1 else "Benign"
-            mis_text += f"Process {process_number}:\n  True Label: {true_label}, Predicted: {pred_label}\n"
+            mis_text += f"Dump file {process_number}:\n  True Label: {true_label}, Predicted: {pred_label}\n"
         return mis_text
