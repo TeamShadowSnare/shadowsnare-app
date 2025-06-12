@@ -177,62 +177,54 @@ class UserModeController:
             traceback.print_exc()
             self.view.show_result(f"<span style='color:red;'>❌ Failed to extract CSV: {e}</span>")
 
-            
     def handle_upload_csv_directly(self):
+        file_path, _ = QFileDialog.getOpenFileName(self.view, "Select CSV file", "", "CSV Files (*.csv)")
+        if not file_path:
+            return
+
         try:
-            file_path, _ = QFileDialog.getOpenFileName(
-                self.view, "Select CSV file", "", "CSV Files (*.csv)"
-            )
-            if not file_path:
-                return
+            # Load CSV
+            self.data = pd.read_csv(file_path)
 
-            # Step 1: Load CSV
-            df, feature_names = self.predictor.load_csv(file_path)
-            numeric_df = df.select_dtypes(include=[float, int])
-            self.data = numeric_df
-            self.feature_names = list(numeric_df.columns)
-            self.feature_data = numeric_df.values
+            # Extract features names, skipping label if exists
+            self.feature_names = list(self.data.columns[1:])  # assuming the first column is a label or ID
 
-            # Step 2: Predict
-            probabilities, binary_preds, labels, used_features = self.predictor.predict(numeric_df)
-
-            # Step 3: Summary
-            benign_count = (binary_preds == 0).sum()
-            malicious_count = (binary_preds == 1).sum()
-            total_count = len(binary_preds)
-            status = "⚠️ Potential Malware Detected" if malicious_count > 0 else "✅ Device Clean"
-
-            summary_html = self.summarizer.generate_summary(
-                total_count, benign_count, malicious_count, status
-            )
-            self.view.data_display.setHtml(summary_html)
-            self.view.analysis_widget.setVisible(True)
-
-            # Step 4: Explainability
-            self.view.explanation_text_edit.clear()
-            self.explainer = ExplainabilityService()
-            self.explainer.initialize_explainer(
-                model=self.predictor.model,
-                X_train=used_features,
-                feature_names=self.predictor.model.selected_features
-            )
-
-            for idx in (binary_preds == 1).nonzero()[0]:
-                sample = used_features.iloc[idx]
-                shap_text = self.explainer.generate_explanation_for_sample(used_features, sample, idx)
-                self.view.append_shap_explanation(idx + 1, shap_text)
-
-            # Step 5: Show raw data (formatted nicely)
+            # Format data for display
             formatted_data = "\n\n".join([
-                f"Process {i+1}:\n" + ", ".join(map(str, row))
-                for i, row in numeric_df.iterrows()
+                f"Dump file {i+1}:\n" + ", ".join(map(str, row[1:]))
+                for i, row in self.data.iterrows()
             ])
             self.view.data_text_edit.setText(formatted_data)
 
+            # Perform prediction
+            probabilities, binary_preds, labels, features_df = self.model.predict(self.data)
+
+            benign_count = (binary_preds == 0).sum()
+            malicious_count = (binary_preds == 1).sum()
+            total_count = len(binary_preds)
+            status = "Potential Malware Detected" if malicious_count > 0 else "Device Clean"
+
+            # Generate summary
+            summary_html = self.summarizer.generate_summary(total_count, benign_count, malicious_count, status)
+            self.view.data_display.setHtml(summary_html)
+
+            # Initialize SHAP explainer
+            self.explainer.initialize_explainer(self.model.model, features_df, self.model.selected_features)
+
+            # Generate SHAP explanations for malicious samples
+            malicious_indices = (binary_preds == 1).nonzero()[0]
+            for idx in malicious_indices:
+                sample = features_df.iloc[idx]
+                shap_text = self.explainer.generate_explanation_for_sample(features_df, sample, idx)
+                self.view.append_shap_explanation(idx + 1, shap_text)
+
+            self.view.tab_widget.setVisible(True)
+            self.view.process_button.setVisible(True)
+
         except Exception as e:
-            import traceback
-            traceback.print_exc()
-            self.view.data_display.setHtml(f"<span style='color:red;'>❌ Failed to analyze CSV file: {e}</span>")
+            self.view.data_display.setText(f"Error processing CSV file: {e}")
+            self.view.tab_widget.setVisible(False)
+
 
 # import os
 # import numpy as np

@@ -1,6 +1,6 @@
 from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QLabel, QPushButton, QTextEdit,
-    QFileDialog, QDialog, QTextBrowser, QFrame
+    QFileDialog, QDialog, QTextBrowser, QFrame, QTabWidget
 )
 from PyQt6.QtCore import Qt
 
@@ -38,21 +38,21 @@ class UserMode(QWidget):
         self.instructions.setWordWrap(True)
         self.main_layout.addWidget(self.instructions)
 
-        # Upload memory dump
-        self.upload_mem_button = QPushButton("📤 Upload memory dump file (.raw/.vmem)")
-        self.upload_mem_button.setStyleSheet(self._button_style("#8e44ad", "#9b59b6"))
-        self.main_layout.addWidget(self.upload_mem_button, alignment=Qt.AlignmentFlag.AlignCenter)
+        # # Upload memory dump
+        # self.upload_mem_button = QPushButton("📤 Upload memory dump file (.raw/.vmem)")
+        # self.upload_mem_button.setStyleSheet(self._button_style("#8e44ad", "#9b59b6"))
+        # self.main_layout.addWidget(self.upload_mem_button, alignment=Qt.AlignmentFlag.AlignCenter)
 
-        # Choose output directory
-        self.choose_dir_button = QPushButton("📁 Choose output directory")
-        self.choose_dir_button.setStyleSheet(self._button_style("#3498db", "#5dade2"))
-        self.main_layout.addWidget(self.choose_dir_button, alignment=Qt.AlignmentFlag.AlignCenter)
+        # # Choose output directory
+        # self.choose_dir_button = QPushButton("📁 Choose output directory")
+        # self.choose_dir_button.setStyleSheet(self._button_style("#3498db", "#5dade2"))
+        # self.main_layout.addWidget(self.choose_dir_button, alignment=Qt.AlignmentFlag.AlignCenter)
 
-        # Run analysis
-        self.run_button = QPushButton("🚀 Run Analysis")
-        self.run_button.setStyleSheet(self._button_style("#27ae60", "#52be80"))
-        self.run_button.setEnabled(False)
-        self.main_layout.addWidget(self.run_button, alignment=Qt.AlignmentFlag.AlignCenter)
+        # # Run analysis
+        # self.run_button = QPushButton("🚀 Run Analysis")
+        # self.run_button.setStyleSheet(self._button_style("#27ae60", "#52be80"))
+        # self.run_button.setEnabled(False)
+        # self.main_layout.addWidget(self.run_button, alignment=Qt.AlignmentFlag.AlignCenter)
 
         # Create Dump button
         self.create_dump_button = QPushButton("🧠 Create Memory Dump")
@@ -78,8 +78,14 @@ class UserMode(QWidget):
         # Summary output (top box)
         self.summary_container = QFrame()
         self.summary_layout = QVBoxLayout(self.summary_container)
+
         self.data_display = QTextBrowser()
         self.data_display.setReadOnly(True)
+
+        # 👇 Add this:
+        self.data_display.setOpenExternalLinks(False)
+        self.data_display.anchorClicked.connect(self._handle_anchor_click)
+
         self.summary_layout.addWidget(self.data_display)
         self.analysis_layout.addWidget(self.summary_container)
 
@@ -88,10 +94,10 @@ class UserMode(QWidget):
         self.explanation_text_edit.setReadOnly(True)
         self.analysis_layout.addWidget(self.explanation_text_edit)
 
-        # Raw data display (bottom box)
-        self.data_text_edit = QTextEdit()
-        self.data_text_edit.setReadOnly(True)
-        self.analysis_layout.addWidget(self.data_text_edit)
+        # # Raw data display (bottom box)
+        # self.data_text_edit = QTextEdit()
+        # self.data_text_edit.setReadOnly(True)
+        # self.analysis_layout.addWidget(self.data_text_edit)
 
         # SHAP popup
         self.setup_explanation_popup()
@@ -111,9 +117,9 @@ class UserMode(QWidget):
         """
 
     def setup_connections(self, controller):
-        self.upload_mem_button.clicked.connect(controller.handle_upload_memory_file)
-        self.choose_dir_button.clicked.connect(controller.handle_choose_output_directory)
-        self.run_button.clicked.connect(controller.handle_run_analysis)
+        # self.upload_mem_button.clicked.connect(controller.handle_upload_memory_file)
+        # self.choose_dir_button.clicked.connect(controller.handle_choose_output_directory)
+        # self.run_button.clicked.connect(controller.handle_run_analysis)
         self.create_dump_button.clicked.connect(controller.handle_create_dump)
         self.extract_csv_button.clicked.connect(controller.handle_raw_to_csv)
         self.upload_csv_button.clicked.connect(controller.handle_upload_csv_directly)
@@ -144,3 +150,8 @@ class UserMode(QWidget):
         current = self.explanation_text_edit.toPlainText()
         new_text = f"🔍 Dump file {process_index} Explanation:\n{text}\n\n"
         self.explanation_text_edit.setPlainText(current + new_text)
+
+    def _handle_anchor_click(self, link):
+        print("✅ Anchor clicked:", link.toString())  # <-- add this line
+        if link.toString() == "#":
+            self.show_explanation_popup()
