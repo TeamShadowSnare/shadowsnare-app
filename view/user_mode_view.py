@@ -54,6 +54,20 @@ class UserMode(QWidget):
         self.run_button.setEnabled(False)
         self.main_layout.addWidget(self.run_button, alignment=Qt.AlignmentFlag.AlignCenter)
 
+        # Create Dump button
+        self.create_dump_button = QPushButton("🧠 Create Memory Dump")
+        self.create_dump_button.setStyleSheet(self._button_style("#16a085", "#1abc9c"))
+        self.main_layout.addWidget(self.create_dump_button, alignment=Qt.AlignmentFlag.AlignCenter)
+
+        # Extract CSV from memory file only
+        self.extract_csv_button = QPushButton("📑 Extract Features to CSV")
+        self.extract_csv_button.setStyleSheet(self._button_style("#d35400", "#e67e22"))
+        self.main_layout.addWidget(self.extract_csv_button, alignment=Qt.AlignmentFlag.AlignCenter)
+
+        self.upload_csv_button = QPushButton("📄 Upload and Analyze CSV")
+        self.upload_csv_button.setStyleSheet(self._button_style("#f39c12", "#f1c40f"))
+        self.main_layout.addWidget(self.upload_csv_button, alignment=Qt.AlignmentFlag.AlignCenter)
+
         # Results view
         self.analysis_widget = QWidget()
         self.analysis_layout = QVBoxLayout()
@@ -61,7 +75,7 @@ class UserMode(QWidget):
         self.analysis_widget.setVisible(False)
         self.main_layout.addWidget(self.analysis_widget)
 
-        # Summary output
+        # Summary output (top box)
         self.summary_container = QFrame()
         self.summary_layout = QVBoxLayout(self.summary_container)
         self.data_display = QTextBrowser()
@@ -69,8 +83,17 @@ class UserMode(QWidget):
         self.summary_layout.addWidget(self.data_display)
         self.analysis_layout.addWidget(self.summary_container)
 
+        # SHAP Explanation area (middle box)
         self.explanation_text_edit = QTextEdit()
         self.explanation_text_edit.setReadOnly(True)
+        self.analysis_layout.addWidget(self.explanation_text_edit)
+
+        # Raw data display (bottom box)
+        self.data_text_edit = QTextEdit()
+        self.data_text_edit.setReadOnly(True)
+        self.analysis_layout.addWidget(self.data_text_edit)
+
+        # SHAP popup
         self.setup_explanation_popup()
 
     def _button_style(self, color, hover_color):
@@ -91,6 +114,10 @@ class UserMode(QWidget):
         self.upload_mem_button.clicked.connect(controller.handle_upload_memory_file)
         self.choose_dir_button.clicked.connect(controller.handle_choose_output_directory)
         self.run_button.clicked.connect(controller.handle_run_analysis)
+        self.create_dump_button.clicked.connect(controller.handle_create_dump)
+        self.extract_csv_button.clicked.connect(controller.handle_raw_to_csv)
+        self.upload_csv_button.clicked.connect(controller.handle_upload_csv_directly)
+
 
     def try_enable_run_button(self):
         if self.memory_file_path and self.output_directory:
@@ -112,3 +139,8 @@ class UserMode(QWidget):
     def show_explanation_popup(self):
         self.explanation_text_edit_popup.setPlainText(self.explanation_text_edit.toPlainText())
         self.explanation_dialog.exec()
+
+    def append_shap_explanation(self, process_index: int, text: str):
+        current = self.explanation_text_edit.toPlainText()
+        new_text = f"🔍 Dump file {process_index} Explanation:\n{text}\n\n"
+        self.explanation_text_edit.setPlainText(current + new_text)

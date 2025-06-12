@@ -20,7 +20,7 @@ class CSVUploaderView(QWidget):
         self.left_widget.setLayout(self.left_layout)
         self.splitter.addWidget(self.left_widget)
 
-        self.label = QLabel("Malware Process Detection")
+        self.label = QLabel("Malware Dump File Detection")
         self.left_layout.addWidget(self.label, alignment=Qt.AlignmentFlag.AlignCenter)
 
         self.upload_process_layout = QHBoxLayout()
@@ -91,7 +91,7 @@ class CSVUploaderView(QWidget):
 
     # New view methods for the refactored controller
     def show_data_preview(self, data):
-        text = "\n\n".join([f"Process {i+1}:\n" + ", ".join(row) for i, row in enumerate(data[:, 2:])])
+        text = "\n\n".join([f"Dump file {i+1}:\n" + ", ".join(row) for i, row in enumerate(data[:, 2:])])
         self.data_text_edit.setText(text)
         self.process_button.setVisible(True)
 
@@ -120,6 +120,6 @@ class CSVUploaderView(QWidget):
 
     def append_shap_explanation(self, process_index: int, text: str):
         current = self.explanation_text_edit.toPlainText()
-        new_text = f"🔍 Process {process_index} Explanation:\n{text}\n\n"
+        new_text = f"🔍 Dump file {process_index} Explanation:\n{text}\n\n"
         self.explanation_text_edit.setPlainText(current + new_text)
 
