@@ -38,35 +38,35 @@ class UserMode(QWidget):
         self.instructions.setWordWrap(True)
         self.main_layout.addWidget(self.instructions)
 
-        # Upload memory dump
-        self.upload_mem_button = QPushButton("📤 Upload memory dump file (.raw/.vmem)")
-        self.upload_mem_button.setStyleSheet(self._button_style("#8e44ad", "#9b59b6"))
-        self.main_layout.addWidget(self.upload_mem_button, alignment=Qt.AlignmentFlag.AlignCenter)
+        # # Upload memory dump
+        # self.upload_mem_button = QPushButton("📤 Upload memory dump file (.raw/.vmem)")
+        # self.upload_mem_button.setStyleSheet(self._button_style("#8e44ad", "#9b59b6"))
+        # self.main_layout.addWidget(self.upload_mem_button, alignment=Qt.AlignmentFlag.AlignCenter)
 
-        # Choose output directory
-        self.choose_dir_button = QPushButton("📁 Choose output directory")
-        self.choose_dir_button.setStyleSheet(self._button_style("#3498db", "#5dade2"))
-        self.main_layout.addWidget(self.choose_dir_button, alignment=Qt.AlignmentFlag.AlignCenter)
+        # # Choose output directory
+        # self.choose_dir_button = QPushButton("📁 Choose output directory")
+        # self.choose_dir_button.setStyleSheet(self._button_style("#3498db", "#5dade2"))
+        # self.main_layout.addWidget(self.choose_dir_button, alignment=Qt.AlignmentFlag.AlignCenter)
 
-        # Run analysis
-        self.run_button = QPushButton("🚀 Run Analysis")
-        self.run_button.setStyleSheet(self._button_style("#27ae60", "#52be80"))
-        self.run_button.setEnabled(False)
-        self.main_layout.addWidget(self.run_button, alignment=Qt.AlignmentFlag.AlignCenter)
+        # # Run analysis
+        # self.run_button = QPushButton("🚀 Run Analysis")
+        # self.run_button.setStyleSheet(self._button_style("#27ae60", "#52be80"))
+        # self.run_button.setEnabled(False)
+        # self.main_layout.addWidget(self.run_button, alignment=Qt.AlignmentFlag.AlignCenter)
 
-        # # Create Dump button
-        # self.create_dump_button = QPushButton("🧠 Create Memory Dump")
-        # self.create_dump_button.setStyleSheet(self._button_style("#16a085", "#1abc9c"))
-        # self.main_layout.addWidget(self.create_dump_button, alignment=Qt.AlignmentFlag.AlignCenter)
+        # Create Dump button
+        self.create_dump_button = QPushButton("🧠 Create Memory Dump")
+        self.create_dump_button.setStyleSheet(self._button_style("#16a085", "#1abc9c"))
+        self.main_layout.addWidget(self.create_dump_button, alignment=Qt.AlignmentFlag.AlignCenter)
 
-        # # Extract CSV from memory file only
-        # self.extract_csv_button = QPushButton("📑 Extract Features to CSV")
-        # self.extract_csv_button.setStyleSheet(self._button_style("#d35400", "#e67e22"))
-        # self.main_layout.addWidget(self.extract_csv_button, alignment=Qt.AlignmentFlag.AlignCenter)
+        # Extract CSV from memory file only
+        self.extract_csv_button = QPushButton("📑 Extract Features to CSV")
+        self.extract_csv_button.setStyleSheet(self._button_style("#d35400", "#e67e22"))
+        self.main_layout.addWidget(self.extract_csv_button, alignment=Qt.AlignmentFlag.AlignCenter)
 
-        # self.upload_csv_button = QPushButton("📄 Upload and Analyze CSV")
-        # self.upload_csv_button.setStyleSheet(self._button_style("#f39c12", "#f1c40f"))
-        # self.main_layout.addWidget(self.upload_csv_button, alignment=Qt.AlignmentFlag.AlignCenter)
+        self.upload_csv_button = QPushButton("📄 Upload and Analyze CSV")
+        self.upload_csv_button.setStyleSheet(self._button_style("#f39c12", "#f1c40f"))
+        self.main_layout.addWidget(self.upload_csv_button, alignment=Qt.AlignmentFlag.AlignCenter)
 
         # Results view
         self.analysis_widget = QWidget()
@@ -115,12 +115,12 @@ class UserMode(QWidget):
         """
 
     def setup_connections(self, controller):
-        self.upload_mem_button.clicked.connect(controller.handle_upload_memory_file)
-        self.choose_dir_button.clicked.connect(controller.handle_choose_output_directory)
-        self.run_button.clicked.connect(controller.handle_run_analysis)
-        # self.create_dump_button.clicked.connect(controller.handle_create_dump)
-        # self.extract_csv_button.clicked.connect(controller.handle_raw_to_csv)
-        # self.upload_csv_button.clicked.connect(controller.handle_upload_csv_directly)
+        # self.upload_mem_button.clicked.connect(controller.handle_upload_memory_file)
+        # self.choose_dir_button.clicked.connect(controller.handle_choose_output_directory)
+        # self.run_button.clicked.connect(controller.handle_run_analysis)
+        self.create_dump_button.clicked.connect(controller.handle_create_dump)
+        self.extract_csv_button.clicked.connect(controller.handle_raw_to_csv)
+        self.upload_csv_button.clicked.connect(controller.handle_analyze_csv)
 
 
     def try_enable_run_button(self):
