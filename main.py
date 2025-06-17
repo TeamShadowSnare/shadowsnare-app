@@ -4,7 +4,7 @@ from view.main_window import MainWindow
 from controller.csv_uploader_controller import CSVUploaderController
 
 if __name__ == '__main__':
-    print("🚀 main.py launched with args:", sys.argv)
+    print("main.py launched with args:", sys.argv)
 
     # Case: Called after elevation for creating dump
     if "--create-dump" in sys.argv:

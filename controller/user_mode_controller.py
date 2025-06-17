@@ -249,10 +249,10 @@ class UserModeController:
         #     traceback.print_exc()
         #     self.view.show_result(f"<span style='color:red;'>❌ Error during analysis: {e}</span>")
 
+
     def handle_create_dump(self):
         print("🧠 Entered handle_create_dump()")
 
-        # 1. Get or ask for dump directory first (before elevation)
         dump_dir = get_default("dump")
         if not dump_dir or not os.path.isdir(dump_dir):
             dump_dir = QFileDialog.getExistingDirectory(self.view, "Choose dump directory")
@@ -262,7 +262,7 @@ class UserModeController:
             set_default("dump", dump_dir)
 
         dump_path = os.path.join(dump_dir, "mem.raw")
-        self.view.memory_file_path = dump_path  # Store path early
+        self.view.memory_file_path = dump_path  
 
         # 2. Check if WinPmem exists
         winpmem_path = "C:/winpmem/winpmem_mini_x64_rc2.exe"
@@ -274,7 +274,6 @@ class UserModeController:
         if not ctypes.windll.shell32.IsUserAnAdmin():
             print("🔒 Not admin — requesting elevation...")
             self.view.show_result("🔒 Requesting admin permissions...")
-            from utils.run_as_admin import run_as_admin
             if not run_as_admin("--create-dump"):
                 sys.exit()
             return
@@ -322,7 +321,7 @@ class UserModeController:
         self.csv_thread.start()
 
     def on_csv_extracted(self, csv_path: str):
-        self.last_csv_path = csv_path              # remember for analysis button
+        self.last_csv_path = csv_path           
         self.view.show_result(
             f"📑 Feature extraction completed.<br>"
             f"✅ CSV saved at:<br><code>{csv_path}</code><br><br>"

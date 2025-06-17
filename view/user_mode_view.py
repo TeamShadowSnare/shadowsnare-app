@@ -86,7 +86,6 @@ class UserMode(QWidget):
         self.data_display = QTextBrowser()
         self.data_display.setReadOnly(True)
 
-        # 👇 Add this:
         self.data_display.setOpenExternalLinks(False)
         self.data_display.anchorClicked.connect(self._handle_anchor_click)
 
