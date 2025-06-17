@@ -359,7 +359,6 @@ class UserModeController:
         # Step 1: Get last known CSV path or ask user
         csv_path = getattr(self, "last_csv_path", None)
 
-        # ✅ If not already stored, try to load from default path
         if not csv_path:
             default_dir = get_default("analysis")
             if default_dir:
@@ -367,7 +366,6 @@ class UserModeController:
                 if os.path.isfile(tentative_path):
                     csv_path = tentative_path
 
-        # ✅ Still nothing or invalid file? Ask user.
         if not csv_path or not os.path.isfile(csv_path):
             csv_path, _ = QFileDialog.getOpenFileName(
                 self.view, "Select CSV", get_default("analysis"), "CSV Files (*.csv)"
@@ -402,16 +400,19 @@ class UserModeController:
             malicious_count = (binary_preds == 1).sum()
             total_count = len(binary_preds)
             status = "Potential Malware Detected" if malicious_count > 0 else "Device Clean"
-            summary_html = self.summarizer.generate_summary(
-                total_count, benign_count, malicious_count, status
-            )
 
             # Step 5: Add clickable SHAP message
-            summary_html += """
-                <div style='text-align:center; margin-top: 20px;'>
-                    <a href='#' style='font-size:18px; color:#00bcd4;'>🔍 Click here to view explanation</a>
-                </div>
+            explanation_link_html = """
+            <a href="#" style="color: white; text-decoration: none; font-size: 18px;">
+                🔍 View explanation
+            </a>
             """
+
+            summary_html = self.summarizer.generate_summary(
+                total_count, benign_count, malicious_count, status,
+                explanation_link=explanation_link_html
+            )
+
             self.view.data_display.setHtml(summary_html)
 
             # Step 6: SHAP explanations
@@ -423,11 +424,13 @@ class UserModeController:
 
             # Step 7: Update UI
             self.view.analysis_widget.setVisible(True)
-            self.view.title.setVisible(False)
             self.view.instructions.setVisible(False)
             self.view.create_dump_button.setVisible(False)
             self.view.extract_csv_button.setVisible(False)
             self.view.upload_csv_button.setVisible(False)
+
+            for arrow in self.view.arrow_labels:
+                arrow.setVisible(False)
 
             print("✅ Analysis done.")
 

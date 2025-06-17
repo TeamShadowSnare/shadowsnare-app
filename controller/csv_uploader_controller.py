@@ -133,7 +133,7 @@ class CSVUploaderController:
         if self.file_path:
             try:
                 self.data = pd.read_csv(self.file_path)
-                self.feature_names = list(self.data.columns[1:])  # Skip label
+                self.feature_names = list(self.data.columns[1:]) 
 
                 formatted_data = "\n\n".join([
                     f"Dump file {i+1}:\n" + ", ".join(map(str, row[1:]))

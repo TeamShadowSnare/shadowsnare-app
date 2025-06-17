@@ -1,6 +1,6 @@
 from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QLabel, QPushButton, QTextEdit,
-    QFileDialog, QDialog, QTextBrowser, QFrame, QTabWidget
+    QFileDialog, QDialog, QTextBrowser, QFrame, QTabWidget, QHBoxLayout
 )
 from PyQt6.QtCore import Qt
 
@@ -18,55 +18,59 @@ class UserMode(QWidget):
         self.main_layout.setSpacing(24)
         self.main_layout.setContentsMargins(50, 50, 50, 50)
 
+        self.arrow_labels = []
         # Title
-        self.title = QLabel("ShadowSnare")
-        self.title.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self.title.setStyleSheet("font-size: 48px; font-weight: bold; color: #6dd5fa;")
-        self.main_layout.addWidget(self.title)
+        # self.title = QLabel("ShadowSnare")
+        # self.title.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        # self.title.setStyleSheet("font-size: 48px; font-weight: bold; color: #6dd5fa;")
+        # self.main_layout.addWidget(self.title)
 
         # Instructions
-        self.instructions = QLabel("""
-            <div style='text-align: center; color: white;'>
-                <h2 style='font-size: 26px; color: #00bcd4;'>How to Use:</h2>
-                <p style='font-size: 20px;'>
-                1. Upload a memory dump file (.raw/.vmem).<br>
-                2. Choose where to save the CSV.<br>
-                3. Run analysis to detect malware.
-                </p>
-            </div>
-        """)
+        self.instructions = QLabel(
+    """
+    <div style='text-align:center; color:white;'>
+        <h2 style='font-size:26px; color:#6dd5fa; margin-bottom:30px;'>How to Use:</h2>
+        <p style="font-size:20px; color:white; line-height:2;">
+           1. <strong>Create a memory-dump file (.raw/.vmem).</strong><br>
+           2. <strong>Extract features to a CSV file.</strong><br>
+           3. <strong>Run analysis to detect malware.</strong>
+        </p>
+    </div>
+    """
+)
         self.instructions.setWordWrap(True)
         self.main_layout.addWidget(self.instructions)
 
-        # # Upload memory dump
-        # self.upload_mem_button = QPushButton("📤 Upload memory dump file (.raw/.vmem)")
-        # self.upload_mem_button.setStyleSheet(self._button_style("#8e44ad", "#9b59b6"))
-        # self.main_layout.addWidget(self.upload_mem_button, alignment=Qt.AlignmentFlag.AlignCenter)
 
-        # # Choose output directory
-        # self.choose_dir_button = QPushButton("📁 Choose output directory")
-        # self.choose_dir_button.setStyleSheet(self._button_style("#3498db", "#5dade2"))
-        # self.main_layout.addWidget(self.choose_dir_button, alignment=Qt.AlignmentFlag.AlignCenter)
-
-        # # Run analysis
-        # self.run_button = QPushButton("🚀 Run Analysis")
-        # self.run_button.setStyleSheet(self._button_style("#27ae60", "#52be80"))
-        # self.run_button.setEnabled(False)
-        # self.main_layout.addWidget(self.run_button, alignment=Qt.AlignmentFlag.AlignCenter)
-
-        # Create Dump button
         self.create_dump_button = QPushButton("🧠 Create Memory Dump")
-        self.create_dump_button.setStyleSheet(self._button_style("#16a085", "#1abc9c"))
-        self.main_layout.addWidget(self.create_dump_button, alignment=Qt.AlignmentFlag.AlignCenter)
 
-        # Extract CSV from memory file only
+        self.create_dump_button.setStyleSheet(self._button_style("#3c5060", "#536b7d"))
+
         self.extract_csv_button = QPushButton("📑 Extract Features to CSV")
-        self.extract_csv_button.setStyleSheet(self._button_style("#d35400", "#e67e22"))
-        self.main_layout.addWidget(self.extract_csv_button, alignment=Qt.AlignmentFlag.AlignCenter)
+        self.extract_csv_button.setStyleSheet(self._button_style("#3c5060", "#536b7d"))
 
         self.upload_csv_button = QPushButton("📄 Upload and Analyze CSV")
-        self.upload_csv_button.setStyleSheet(self._button_style("#f39c12", "#f1c40f"))
-        self.main_layout.addWidget(self.upload_csv_button, alignment=Qt.AlignmentFlag.AlignCenter)
+        self.upload_csv_button.setStyleSheet(self._button_style("#3c5060", "#536b7d"))
+
+        # Row layout with arrows between buttons
+        row = QHBoxLayout()
+        row.setSpacing(16)
+        row.setAlignment(Qt.AlignmentFlag.AlignCenter)
+
+        def add_flow_button(btn, is_last=False):
+            row.addWidget(btn)
+            if not is_last:
+                arrow = QLabel("➜")
+                arrow.setStyleSheet("font-size:32px; color:#6dd5fa;")
+                arrow.setAlignment(Qt.AlignmentFlag.AlignCenter)
+                row.addWidget(arrow)
+                self.arrow_labels.append(arrow)  
+
+        add_flow_button(self.create_dump_button)
+        add_flow_button(self.extract_csv_button)
+        add_flow_button(self.upload_csv_button, is_last=True)
+
+        self.main_layout.addLayout(row)
 
         # Results view
         self.analysis_widget = QWidget()
@@ -150,6 +154,6 @@ class UserMode(QWidget):
         self.explanation_text_edit.setPlainText(current + new_text)
 
     def _handle_anchor_click(self, link):
-        print("✅ Anchor clicked:", link.toString())  # <-- add this line
+        print("✅ Anchor clicked:", link.toString()) 
         if link.toString() == "#":
             self.show_explanation_popup()
