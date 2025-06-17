@@ -114,7 +114,7 @@ from services.plot_service import PlotService
 from services.summary_service import SummaryService
 from model.malware_model import MalwareDetector
 
-class CSVUploaderController:
+class devModeController:
     def __init__(self, view):
         self.view = view
         self.view.setup_connections(self)

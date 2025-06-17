@@ -1,7 +1,7 @@
 from PyQt6.QtWidgets import QApplication
 import sys
 from view.main_window import MainWindow
-from controller.csv_uploader_controller import CSVUploaderController
+from controller.dev_mode_controller import devModeController
 
 if __name__ == '__main__':
     print("main.py launched with args:", sys.argv)
@@ -26,6 +26,6 @@ if __name__ == '__main__':
     app = QApplication(sys.argv)
     window = MainWindow()
     window.load_stylesheet("view/style.qss")
-    controller = CSVUploaderController(window.csv_uploader_view)
+    controller = devModeController(window.dev_mode_view)
     window.show()
     sys.exit(app.exec())
