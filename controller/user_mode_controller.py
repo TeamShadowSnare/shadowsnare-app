@@ -10,6 +10,7 @@ import traceback
 from utils.analysis_worker import CsvAnalyzeWorker
 from PyQt6.QtCore import QThread
 from PyQt6.QtWidgets import QApplication, QMessageBox
+from utils.memory_dump_worker import MemoryDumpWorker
 from utils.csv_extract_worker import CsvExtractWorker
 from utils.default_path import get_default, set_default
 
@@ -264,39 +265,105 @@ class UserModeController:
         dump_path = os.path.join(dump_dir, "mem.raw")
         self.view.memory_file_path = dump_path  
 
-        # 2. Check if WinPmem exists
         winpmem_path = "C:/winpmem/winpmem_mini_x64_rc2.exe"
         if not os.path.exists(winpmem_path):
             self.view.show_result(f"❌ WinPmem not found at: {winpmem_path}")
             return
 
-        # 3. Check if Admin
+        # ✅ Check if admin — if not, try elevation and exit if successful
         if not ctypes.windll.shell32.IsUserAnAdmin():
-            print("🔒 Not admin — requesting elevation...")
             self.view.show_result("🔒 Requesting admin permissions...")
-            if not run_as_admin("--create-dump"):
-                sys.exit()
-            return
 
-        # 4. Run WinPmem
-        try:
-            print(f"⏳ Running WinPmem: {winpmem_path} {dump_path}")
-            result = subprocess.run([winpmem_path, dump_path], check=False)
-
-            # 5. Check success
-            if result.returncode in [0, 1] and os.path.exists(dump_path) and os.path.getsize(dump_path) > 100 * 1024 * 1024:
-                print("✅ Dump created!")
-                self.view.show_result(f"✅ Memory dump created at:<br><code>{dump_path}</code>")
-                QMessageBox.information(self.view, "Dump Created", f"Memory dump saved at:\n{dump_path}")
+            if run_as_admin("--create-dump", "--user-mode"):
+                sys.exit()  # Exit current non-admin instance
             else:
-                raise subprocess.CalledProcessError(result.returncode, result.args)
+                self.view.show_result("❌ Admin elevation failed or cancelled.")
+                return
 
-        except subprocess.CalledProcessError as e:
-            print(f"❌ Dump creation failed (subprocess error): {e}")
-            self.view.show_result(f"❌ Dump creation failed: {e}")
-        except Exception as e:
-            print(f"❌ Unexpected error: {e}")
-            self.view.show_result(f"❌ Unexpected error: {e}")
+        # ✅ If already admin — continue with dump creation
+        self.view.show_result("🧠 Creating memory dump... please wait...")
+
+        self.dump_thread = QThread()
+        self.dump_worker = MemoryDumpWorker(winpmem_path, dump_path)
+        self.dump_worker.moveToThread(self.dump_thread)
+
+        self.dump_thread.started.connect(self.dump_worker.run)
+        self.dump_worker.progress.connect(self.on_progress_update)
+        self.dump_worker.finished.connect(self.on_dump_finished)
+        self.dump_worker.error.connect(lambda msg: self.view.show_result(f"<span style='color:red;'>{msg}</span>"))
+
+        self.dump_worker.finished.connect(self.dump_thread.quit)
+        self.dump_worker.finished.connect(self.dump_worker.deleteLater)
+        self.dump_thread.finished.connect(self.dump_thread.deleteLater)
+
+        self.dump_thread.start()
+
+
+
+    def on_progress_update(self, message):
+        self.view.data_display.append(message)
+        self.view.data_display.repaint()
+        QApplication.processEvents()
+        
+    def on_dump_finished(self, dump_path):
+        self.view.show_result(f"✅ Memory dump created at:<br><code>{dump_path}</code>")
+        QMessageBox.information(self.view, "Dump Created", f"Memory dump saved at:\n{dump_path}")
+
+
+
+
+
+
+
+
+
+    # def handle_create_dump(self):
+    #     print("🧠 Entered handle_create_dump()")
+
+    #     dump_dir = get_default("dump")
+    #     if not dump_dir or not os.path.isdir(dump_dir):
+    #         dump_dir = QFileDialog.getExistingDirectory(self.view, "Choose dump directory")
+    #         if not dump_dir:
+    #             print("🚫 No directory selected for dump.")
+    #             return
+    #         set_default("dump", dump_dir)
+
+    #     dump_path = os.path.join(dump_dir, "mem.raw")
+    #     self.view.memory_file_path = dump_path  
+
+    #     # 2. Check if WinPmem exists
+    #     winpmem_path = "C:/winpmem/winpmem_mini_x64_rc2.exe"
+    #     if not os.path.exists(winpmem_path):
+    #         self.view.show_result(f"❌ WinPmem not found at: {winpmem_path}")
+    #         return
+
+    #     # 3. Check if Admin
+    #     if not ctypes.windll.shell32.IsUserAnAdmin():
+    #         print("🔒 Not admin — requesting elevation...")
+    #         self.view.show_result("🔒 Requesting admin permissions...")
+    #         if not run_as_admin("--create-dump"):
+    #             sys.exit()
+    #         return
+
+    #     # 4. Run WinPmem
+    #     try:
+    #         print(f"⏳ Running WinPmem: {winpmem_path} {dump_path}")
+    #         result = subprocess.run([winpmem_path, dump_path], check=False)
+
+    #         # 5. Check success
+    #         if result.returncode in [0, 1] and os.path.exists(dump_path) and os.path.getsize(dump_path) > 100 * 1024 * 1024:
+    #             print("✅ Dump created!")
+    #             self.view.show_result(f"✅ Memory dump created at:<br><code>{dump_path}</code>")
+    #             QMessageBox.information(self.view, "Dump Created", f"Memory dump saved at:\n{dump_path}")
+    #         else:
+    #             raise subprocess.CalledProcessError(result.returncode, result.args)
+
+    #     except subprocess.CalledProcessError as e:
+    #         print(f"❌ Dump creation failed (subprocess error): {e}")
+    #         self.view.show_result(f"❌ Dump creation failed: {e}")
+    #     except Exception as e:
+    #         print(f"❌ Unexpected error: {e}")
+    #         self.view.show_result(f"❌ Unexpected error: {e}")
 
     def handle_raw_to_csv(self):
         dump_path = self._resolve_dump_path()
