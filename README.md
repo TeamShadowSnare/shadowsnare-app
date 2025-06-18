@@ -1,68 +1,81 @@
-# ShadowSnare
+## 🛡️ ShadowSnare
 
-ShadowSnare is a stealthy malware detection tool designed for cybersecurity specialists. It leverages deep learning to analyze memory dump files for obfuscated malware detection, providing an efficient and reliable solution for identifying stealthy threats.
+**ShadowSnare** is a stealthy, deep learning–powered malware detection tool designed for cybersecurity professionals. It analyzes memory dump files to detect obfuscated threats using state-of-the-art neural networks, all within a streamlined and intuitive desktop interface.
 
-## Features
+---
 
-- **Memory Dump Analysis**: Extracts features from memory dump files and analyzes them for malware detection.
-- **Deep Learning Integration**: Employs state-of-the-art machine learning models trained on the CIC-MalMem-2022 dataset.
-- **User-Friendly Interface**: Built using PyQt6 for a seamless desktop application experience.
-- **Local Processing**: Operates entirely locally without the need for a server.
-- **Specialist-Oriented**: Focused on providing actionable insights for cybersecurity experts.
+### 🚀 Features
 
-## Tech Stack
+- 🧠 **Memory Dump Analysis** – Extracts behavioral features from raw memory dumps and detects malicious activity.
+- 🤖 **Deep Learning Integration** – Utilizes advanced neural networks trained on the [CIC-MalMem-2022](https://www.unb.ca/cic/datasets/malmem-2022.html) dataset for high-accuracy detection.
+- 🖥️ **Modern UI** – Built with PyQt6 for a clean and responsive user experience.
+- 🔒 **Offline Operation** – All detection runs locally with no external dependencies or cloud connections.
+- 🧩 **Expert-Focused Insights** – Displays confusion matrices, SHAP explanations, and misclassified entries for advanced interpretation.
 
-- **Frontend/UI**: PyQt6 (Python)
-- **Machine Learning**: TensorFlow or PyTorch (Deep Learning Framework)
-- **Dataset**: CIC-MalMem-2022
+---
 
-## Installation
+### 🧰 Tech Stack
 
-### Prerequisites
+| Layer        | Technology              |
+|--------------|-------------------------|
+| UI/Frontend  | PyQt6                   |
+| ML Framework | TensorFlow              |
+| Dataset      | CIC-MalMem-2022         |
+| Packaging    | Python 3.x + pip        |
 
-- Python 3.x
-- pip (Python package installer)
+---
 
-### Steps
+### 🛠️ Installation
 
-1. Clone the repository:
+#### Prerequisites
 
-   ```bash
-   git clone https://github.com/yourusername/ShadowSnare.git
-   cd ShadowSnare
-   ```
+- Python 3.9+
+- `pip`
 
-2. Install dependencies:
+#### Steps
 
-   ```bash
-   pip install -r requirements.txt
-   ```
+```bash
+# 1. Clone the repository
+git clone https://github.com/yourusername/ShadowSnare.git
+cd ShadowSnare
 
-3. Run the application:
-   ```bash
-   python main.py
-   ```
+# 2. Install required packages
+pip install -r requirements.txt
 
-## Usage
+# 3. Run the app
+python main.py
+```
 
-1. Launch the application.
-2. Upload a memory dump file using the interface.
-3. The tool extracts features, runs the malware detection model, and provides the results.
+---
 
-## Roadmap
+### 🧪 Usage
 
-- **Phase 1**: Develop the proof-of-concept (by end of March 2025)
-- **Phase 2**: Enhance feature extraction and model performance
-- **Phase 3**: Add real-time analysis capabilities
+1. Launch the ShadowSnare application.
+2. Navigate to **User Mode** via the sidebar.
+3. Choose from the following options:
+   - 🧠 Create a memory dump
+   - 📑 Extract features from the dump
+   - 📄 Analyze the resulting CSV for malware presence
+4. View results including:
+   - Detection labels
+   - Misclassified samples
+   - Confusion matrix
+   - SHAP explanations
 
-## Team
+---
 
-- **[Rani Izsack]** - Project Lead
-- **[Amos Zohar]** - Data aqcuisition and feature extraction, UI developer
-- **[Gal Havshush]** - Machine learning Specialist, UI developer
-- **[Ortal Nissim]** - Machine learning Specialist, UI developer
+### 👥 Team
 
-## Acknowledgements
+- **Rani Izsack** – Project Lead  
+- **Amos Zohar** – Data Acquisition, Feature Extraction, UI Development  
+- **Gal Havshush** – Machine Learning Specialist, UI Development  
+- **Ortal Nissim** – Machine Learning Specialist, UI Development  
 
-- [CIC-MalMem-2022 Dataset](https://www.unb.ca/cic/datasets/malmem-2022.html)
-- OpenAI for assistance in brainstorming ideas and technical implementation
+---
+
+### 🙏 Acknowledgements
+
+- [CIC-MalMem-2022 Dataset](https://www.unb.ca/cic/datasets/malmem-2022.html)  
+- [OpenAI](https://openai.com) – Technical ideation and architecture assistance  
+- [WinPmem](https://github.com/Velocidex/WinPmem) – Memory acquisition tool used in the dump creation process  
+- [Volatility](https://www.volatilityfoundation.org/) – Framework used for memory dump analysis and feature extraction

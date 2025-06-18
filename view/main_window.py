@@ -17,10 +17,11 @@ class MainWindow(QMainWindow):
         layout = QHBoxLayout(central_widget)
 
         self.nav_list = QListWidget()
-        self.nav_list.addItem("Home")
-        self.nav_list.addItem("Dev Mode")
-        self.nav_list.addItem("Settings")         
-        self.nav_list.addItem("User Mode")
+        self.nav_list.addItem("Home")         # index 0
+        self.nav_list.addItem("User Mode")    # index 1
+        self.nav_list.addItem("Dev Mode")     # index 2
+        self.nav_list.addItem("Settings")     # index 3
+
 
         self.nav_list.setFixedWidth(200)
         self.nav_list.setStyleSheet("font-size: 20px; color: white; background-color: #2c3e50;")
@@ -36,10 +37,11 @@ class MainWindow(QMainWindow):
         
         self.user_mode_controller = UserModeController(self.user_mode_view)
 
-        self.stack.addWidget(self.home_view)           # index 0
-        self.stack.addWidget(self.dev_mode_view)       # index 1
-        self.stack.addWidget(self.settings_view)       # index 2
-        self.stack.addWidget(self.user_mode_view)      # index 3
+        self.stack.addWidget(self.home_view)        # index 0
+        self.stack.addWidget(self.user_mode_view)   # index 1
+        self.stack.addWidget(self.dev_mode_view)    # index 2
+        self.stack.addWidget(self.settings_view)    # index 3
+
 
         self.nav_list.setCurrentRow(0)
         self.stack.setCurrentIndex(0)

@@ -44,13 +44,13 @@ class HomeView(QWidget):
                 <h1 style="color: #6dd5fa; text-align: center; margin-top: 0; margin-bottom: 100px;">Getting Started</h1>
                 <ol style="font-size: 20px; color: white; line-height: 2; padding-left: 24px;">
                     <li style="margin-bottom: 16px;">
-                        <strong>Install WinPmem:</strong> <a href="https://github.com/Velocidex/WinPmem/releases" style="color: #00bcd4; text-decoration: none;">Download here</a>
+                        <strong>Download WinPmem:</strong> <a href="https://github.com/Velocidex/WinPmem/releases" style="color: #00bcd4; text-decoration: none;">Download here</a>
                     </li>
                     <li style="margin-bottom: 16px;">
-                        <strong>Save it to:</strong> <code>c:/winpmem/</code>
+                        <strong>Rename the file winpmem_xxx_xxx_xxx.exe to winpmem.exe, then place it in:</strong> <code>c:/winpmem/</code>
                     </li>
                     <li style="margin-bottom: 16px;">
-                        Go to Settings (sidebar) to choose your default folders
+                        Go into the Settings tab to choose your default paths
                     </li>
                     <li style="margin-bottom: 16px;">
                         In User Mode you can:

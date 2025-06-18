@@ -19,11 +19,7 @@ class UserMode(QWidget):
         self.main_layout.setContentsMargins(50, 50, 50, 50)
 
         self.arrow_labels = []
-        # Title
-        # self.title = QLabel("ShadowSnare")
-        # self.title.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        # self.title.setStyleSheet("font-size: 48px; font-weight: bold; color: #6dd5fa;")
-        # self.main_layout.addWidget(self.title)
+
 
         # Instructions
         self.instructions = QLabel(

@@ -3,10 +3,6 @@ from model.malware_model import MalwareDetector
 
 class PredictionService:
     def __init__(self):
-        # This is the same MalwareDetector you used before.
-        # It must expose:
-        #   • self.model        → a trained model with .predict(...)
-        #   • self.scaler       → a fitted scaler (e.g. StandardScaler) used at training time
         self.model = MalwareDetector()
 
     def load_csv(self, file_path):
@@ -36,17 +32,3 @@ class PredictionService:
 
         return probabilities, binary_preds, raw_X, X_scaled
 
-
-# import pandas as pd
-# from model.malware_model import MalwareDetector
-
-# class PredictionService:
-#     def __init__(self):
-#         self.model = MalwareDetector()
-
-#     def load_csv(self, file_path):
-#         df = pd.read_csv(file_path)
-#         return df, list(df.columns)
-
-#     def predict(self, df):
-#         return self.model.predict(df)
