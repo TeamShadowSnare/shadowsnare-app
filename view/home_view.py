@@ -11,7 +11,6 @@ class HomeView(QWidget):
         self.layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.setLayout(self.layout)
 
-        # --- Logo ---
         logo_path = os.path.join("assets", "logo.png")  
         self.logo_label = QLabel()
         logo_pixmap = QPixmap(logo_path)
@@ -24,7 +23,6 @@ class HomeView(QWidget):
         else:
             print(f"⚠️ Logo not found at: {logo_path}")
 
-        # --- Start Button ---
         self.start_button = QPushButton("Get Started")
         self.start_button.setStyleSheet("""
             QPushButton {

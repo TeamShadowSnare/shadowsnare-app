@@ -27,7 +27,6 @@ class MemoryDumpWorker(QObject):
 
             self.progress.emit("⏳ Creating memory dump...")
 
-            # ✅ Use Popen to stream WinPmem output
             process = subprocess.Popen(
                 [self.winpmem_path, self.dump_path],
                 stdout=subprocess.PIPE,
@@ -36,7 +35,6 @@ class MemoryDumpWorker(QObject):
                 bufsize=1
             )
 
-            # Read and emit output in real time
             for line in process.stdout:
                 line = line.strip()
                 if line:

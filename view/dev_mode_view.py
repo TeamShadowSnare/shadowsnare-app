@@ -14,7 +14,6 @@ class devMode(QWidget):
         self.splitter = QSplitter(Qt.Orientation.Horizontal)
         self.main_layout.addWidget(self.splitter)
 
-        # Left panel
         self.left_widget = QWidget()
         self.left_layout = QVBoxLayout()
         self.left_widget.setLayout(self.left_layout)
@@ -96,7 +95,6 @@ class devMode(QWidget):
 
         self.tab_widget.setVisible(False)
 
-        # Right panel
         self.right_widget = QWidget()
         self.right_layout = QVBoxLayout()
         self.right_widget.setLayout(self.right_layout)
@@ -113,7 +111,6 @@ class devMode(QWidget):
         self.upload_button.clicked.connect(controller.upload_csv)
         self.process_button.clicked.connect(controller.process_csv)
 
-    # New view methods for the refactored controller
     def show_data_preview(self, data):
         text = "\n\n".join([f"Dump file {i+1}:\n" + ", ".join(row) for i, row in enumerate(data[:, 2:])])
         self.data_text_edit.setText(text)

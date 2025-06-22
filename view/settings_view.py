@@ -1,22 +1,19 @@
 from PyQt6.QtCore import QSettings, Qt
 from PyQt6.QtWidgets import (
     QWidget, QLineEdit, QPushButton, QFileDialog,
-    QHBoxLayout, QVBoxLayout, QFormLayout, QMessageBox, QLabel, QSizePolicy, QApplication
+    QHBoxLayout, QVBoxLayout, QMessageBox, QLabel, QSizePolicy, QApplication
 )
 
 class SettingsView(QWidget):
     def __init__(self):
         super().__init__()
 
-        # ----------------------------- config ------------------------------
         self.config = QSettings("ShadowSnare", "Paths")
 
-        # ----------------------------- title -------------------------------
         title = QLabel("Settings")
         title.setAlignment(Qt.AlignmentFlag.AlignHCenter)
         title.setStyleSheet("font-size: 32px; font-weight: 700; color: #f1f1f1;")
 
-        # ------------------------ line-edit presets ------------------------
         self.dump_edit     = self._edit(self.config.value("dump_path", ""))
         self.csv_edit      = self._edit(self.config.value("csv_path", ""))
         self.analysis_edit = self._edit(self.config.value("analysis_path", ""))
@@ -30,7 +27,6 @@ class SettingsView(QWidget):
             label.setStyleSheet("font-size: 22px; color: #f1f1f1;")
             return label
 
-        # ----------------------------- form --------------------------------
         form_layout = QVBoxLayout()
         form_layout.setSpacing(16)
 
@@ -38,7 +34,6 @@ class SettingsView(QWidget):
         form_layout.addLayout(self._labeled_row("Default CSV directory to save the extracted features:", self.csv_edit))
         form_layout.addLayout(self._labeled_row("Default analysis directory where the suspect CSV file is located:", self.analysis_edit))
 
-        # ------------------------- save button -----------------------------
         save_btn = QPushButton("💾  Save")
         save_btn.setFixedWidth(160)
         save_btn.setCursor(Qt.CursorShape.PointingHandCursor)
@@ -54,33 +49,24 @@ class SettingsView(QWidget):
         """)
         save_btn.clicked.connect(self._save)
 
-        # -------------------------- main layout ----------------------------
-        # Create a vertical layout that centers horizontally
         outer_wrapper = QVBoxLayout(self)
         outer_wrapper.setAlignment(Qt.AlignmentFlag.AlignTop | Qt.AlignmentFlag.AlignHCenter)
         outer_wrapper.setContentsMargins(0, 40, 0, 40)
         outer_wrapper.setSpacing(30)
 
-        # Create an inner container to limit width and center everything
         container = QWidget()
         container.setMaximumWidth(1200)
         inner_layout = QVBoxLayout(container)
         inner_layout.setSpacing(30)
         inner_layout.setContentsMargins(50, 0, 50, 0)
 
-        # Add content to the inner layout
         inner_layout.addWidget(title)
         inner_layout.addLayout(form_layout)
         inner_layout.addStretch()
         inner_layout.addWidget(save_btn, 0, Qt.AlignmentFlag.AlignHCenter)
 
-        # Add container to outer wrapper
         outer_wrapper.addWidget(container)
 
-
-    # ------------------------------------------------------------------
-    # Helpers
-    # ------------------------------------------------------------------
     def _edit(self, text: str) -> QLineEdit:
         edit = QLineEdit(text)
         edit.setFixedHeight(42)
@@ -126,15 +112,13 @@ class SettingsView(QWidget):
             QLineEdit:focus { border: 2px solid #00bcd4; }
         """)
 
-        # Wrap both in a tight container
         tight_container = QWidget()
         hbox = QHBoxLayout(tight_container)
         hbox.setContentsMargins(0, 0, 0, 0)
-        hbox.setSpacing(6)  # tighter spacing
+        hbox.setSpacing(6)
         hbox.addWidget(line_edit)
         hbox.addWidget(browse)
 
-        # ✅ prevent stretching
         tight_container.setSizePolicy(
             QSizePolicy.Policy.Maximum,
             QSizePolicy.Policy.Fixed
@@ -145,7 +129,7 @@ class SettingsView(QWidget):
     def _labeled_row(self, label_text: str, line_edit: QLineEdit) -> QHBoxLayout:
         label = QLabel(label_text)
         label.setStyleSheet("font-size: 18px; color: #f1f1f1;")
-        label.setFixedWidth(700)  # ✅ Force exact width for consistent left alignment
+        label.setFixedWidth(700)
         label.setTextInteractionFlags(Qt.TextInteractionFlag.NoTextInteraction)
         label.setAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter)
 
@@ -168,20 +152,13 @@ class SettingsView(QWidget):
             self.config.setValue("dump_path",     self.dump_edit.text())
             self.config.setValue("csv_path",      self.csv_edit.text())
             self.config.setValue("analysis_path", self.analysis_edit.text())
-
-            # TEMPORARILY REMOVE STYLESHEET
             QApplication.instance().setStyleSheet("")
-
-            # Use full QMessageBox instance
             msg_box = QMessageBox(self)
             msg_box.setIcon(QMessageBox.Icon.Information)
             msg_box.setWindowTitle("ShadowSnare - message")
             msg_box.setText("Default paths saved successfully!")
             msg_box.setStandardButtons(QMessageBox.StandardButton.Ok)
-
-            # 👇 override only the labels inside this QMessageBox
             msg_box.setStyleSheet("QLabel{ color: black; }")
-
             msg_box.exec()
 
             print("✅ Paths saved")

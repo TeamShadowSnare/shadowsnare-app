@@ -12,9 +12,8 @@ if __name__ == "__main__":
     from controller.dev_mode_controller import devModeController
     dev_controller = devModeController(window.dev_mode_view)
 
-    # ✅ Switch to User Mode if flag is present
     if "--user-mode" in sys.argv:
-        window.nav_list.setCurrentRow(1)  # User Mode index
+        window.nav_list.setCurrentRow(1)
         window.stack.setCurrentIndex(1)
 
     window.show()

@@ -4,7 +4,7 @@ from services.explainability_service import ExplainabilityService
 
 class CsvAnalyzeWorker(QObject):
     progress = pyqtSignal(str)
-    finished = pyqtSignal(str, str)   # summary_html, explanation_text
+    finished = pyqtSignal(str, str)
     error    = pyqtSignal(str)
 
     def __init__(self, csv_path: str, predictor, summarizer):

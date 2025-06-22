@@ -1,6 +1,6 @@
 from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QLabel, QPushButton, QTextEdit,
-    QFileDialog, QDialog, QTextBrowser, QFrame, QTabWidget, QHBoxLayout
+    QDialog, QTextBrowser, QFrame, QHBoxLayout
 )
 from PyQt6.QtCore import Qt
 
@@ -8,11 +8,9 @@ class UserMode(QWidget):
     def __init__(self):
         super().__init__()
 
-        # Paths
         self.memory_file_path = None
         self.output_directory = None
 
-        # Layout
         self.main_layout = QVBoxLayout(self)
         self.main_layout.setAlignment(Qt.AlignmentFlag.AlignTop)
         self.main_layout.setSpacing(24)
@@ -21,7 +19,6 @@ class UserMode(QWidget):
         self.arrow_labels = []
 
 
-        # Instructions
         self.instructions = QLabel(
     """
     <div style='text-align:center; color:white;'>
@@ -48,7 +45,6 @@ class UserMode(QWidget):
         self.upload_csv_button = QPushButton("📄 Upload and Analyze CSV")
         self.upload_csv_button.setStyleSheet(self._button_style("#3c5060", "#536b7d"))
 
-        # Row layout with arrows between buttons
         row = QHBoxLayout()
         row.setSpacing(16)
         row.setAlignment(Qt.AlignmentFlag.AlignCenter)
@@ -68,14 +64,12 @@ class UserMode(QWidget):
 
         self.main_layout.addLayout(row)
 
-        # Results view
         self.analysis_widget = QWidget()
         self.analysis_layout = QVBoxLayout()
         self.analysis_widget.setLayout(self.analysis_layout)
         self.analysis_widget.setVisible(False)
         self.main_layout.addWidget(self.analysis_widget)
 
-        # Summary output (top box)
         self.summary_container = QFrame()
         self.summary_layout = QVBoxLayout(self.summary_container)
 
@@ -88,15 +82,12 @@ class UserMode(QWidget):
         self.summary_layout.addWidget(self.data_display)
         self.analysis_layout.addWidget(self.summary_container)
 
-        # SHAP explanation text (only for popup, NOT shown in main layout)
         self.explanation_text_edit = QTextEdit()
         self.explanation_text_edit.setReadOnly(True)
 
-        # Raw CSV data text (optional — not shown in layout)
         self.data_text_edit = QTextEdit()
         self.data_text_edit.setReadOnly(True)
 
-        # SHAP popup
         self.setup_explanation_popup()
 
     def _button_style(self, color, hover_color):
@@ -114,9 +105,6 @@ class UserMode(QWidget):
         """
 
     def setup_connections(self, controller):
-        # self.upload_mem_button.clicked.connect(controller.handle_upload_memory_file)
-        # self.choose_dir_button.clicked.connect(controller.handle_choose_output_directory)
-        # self.run_button.clicked.connect(controller.handle_run_analysis)
         self.create_dump_button.clicked.connect(controller.handle_create_dump)
         self.extract_csv_button.clicked.connect(controller.handle_raw_to_csv)
         self.upload_csv_button.clicked.connect(controller.handle_analyze_csv)

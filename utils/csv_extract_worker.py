@@ -4,7 +4,7 @@ from services.memory_dump_service import extract_features_and_convert_to_csv
 
 class CsvExtractWorker(QObject):
     progress = pyqtSignal(str)
-    finished = pyqtSignal(str)   # csv_path
+    finished = pyqtSignal(str)
     error    = pyqtSignal(str)
 
     def __init__(self, dump_path: str, csv_dir: str):

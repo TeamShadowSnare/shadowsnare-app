@@ -17,14 +17,14 @@ def run_as_admin(*extra_args):
     print(f"🔁 Relaunching with: {sys.executable} {script} {params}")
 
     try:
-        SW_HIDE = 0  # 🔇 Hides the console window
+        SW_HIDE = 0
         ctypes.windll.shell32.ShellExecuteW(
             None,
             "runas",
             sys.executable,
             f'"{script}" {params}',
             None,
-            SW_HIDE  # ✅ This prevents the new CMD window
+            SW_HIDE
         )
         print("✅ Relaunch initiated (no CMD)")
         return True

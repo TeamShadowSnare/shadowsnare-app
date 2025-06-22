@@ -1,13 +1,9 @@
 import os
-import numpy as np
 import pandas as pd
 from PyQt6.QtWidgets import QFileDialog
 from services.prediction_service import PredictionService
 from services.explainability_service import ExplainabilityService
 from services.summary_service import SummaryService
-from services.memory_dump_service import extract_features_and_convert_to_csv
-import traceback
-from utils.analysis_worker import CsvAnalyzeWorker
 from PyQt6.QtCore import QThread
 from PyQt6.QtWidgets import QApplication, QMessageBox
 from utils.memory_dump_worker import MemoryDumpWorker
@@ -16,7 +12,6 @@ from utils.default_path import get_default, set_default
 
 import ctypes
 import sys
-import subprocess
 from utils.run_as_admin import run_as_admin
 from model.malware_model import MalwareDetector
 
@@ -54,17 +49,15 @@ class UserModeController:
             self.view.show_result(f"❌ WinPmem not found at: {winpmem_path}")
             return
 
-        # ✅ Check if admin — if not, try elevation and exit if successful
         if not ctypes.windll.shell32.IsUserAnAdmin():
             self.view.show_result("🔒 Requesting admin permissions...")
 
             if run_as_admin("--create-dump", "--user-mode"):
-                sys.exit()  # Exit current non-admin instance
+                sys.exit()
             else:
                 self.view.show_result("❌ Admin elevation failed or cancelled.")
                 return
 
-        # ✅ If already admin — continue with dump creation
         self.view.show_result("🧠 Creating memory dump... please wait...")
 
         self.dump_thread = QThread()
@@ -148,7 +141,6 @@ class UserModeController:
 
 
     def handle_analyze_csv(self):    
-        # Step 1: Get last known CSV path or ask user
         csv_path = getattr(self, "last_csv_path", None)
 
         if not csv_path:
@@ -171,8 +163,6 @@ class UserModeController:
         try:
             self.data = pd.read_csv(csv_path)
             print("✅ CSV loaded.")
-
-            # Step 2: Drop metadata and keep numeric features
             df = self.data.drop(columns=["filename", "sample_id", "label", "mem.name_extn"], errors="ignore")
             df = df.select_dtypes(include=[float, int])
 
@@ -183,17 +173,14 @@ class UserModeController:
             ])
             print("📄 Data formatted.")
 
-            # Step 3: Predict
             probabilities, binary_preds, labels, features_df = self.model.predict(df)
             print("🔮 Prediction complete.")
 
-            # Step 4: Summary
             benign_count = (binary_preds == 0).sum()
             malicious_count = (binary_preds == 1).sum()
             total_count = len(binary_preds)
             status = "Potential Malware Detected" if malicious_count > 0 else "Device Clean"
 
-            # Step 5: Add clickable SHAP message
             explanation_link_html = """
             <a href="#" style="color: white; text-decoration: none; font-size: 18px;">
                 🔍 View explanation
@@ -207,14 +194,12 @@ class UserModeController:
 
             self.view.data_display.setHtml(summary_html)
 
-            # Step 6: SHAP explanations
             self.explainer.initialize_explainer(self.model.model, features_df, self.model.selected_features)
             for idx in (binary_preds == 1).nonzero()[0]:
                 sample = features_df.iloc[idx]
                 shap_text = self.explainer.generate_explanation_for_sample(features_df, sample, idx)
                 self.view.append_shap_explanation(idx + 1, shap_text)
 
-            # Step 7: Update UI
             self.view.analysis_widget.setVisible(True)
             self.view.instructions.setVisible(False)
             self.view.create_dump_button.setVisible(False)

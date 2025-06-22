@@ -1,11 +1,6 @@
 import argparse
 import csv
-# import functools
-# import json
-# import subprocess
-# import tempfile
 import os
-# import io
 import pandas as pd
 import traceback
 
@@ -33,10 +28,7 @@ from volatility3.plugins.windows import pslist, dlllist, handles, ldrmodules, ma
 
 def extract_pslist_features(jsondump):
     try:
-        # Handle both list of dicts and DataFrame input
         df = pd.DataFrame(jsondump)
-        # print(f"[DEBUG] pslist DataFrame shape: {df.shape}")
-        # print(f"[DEBUG] pslist columns: {df.columns.tolist()}")
         if not df.empty:
             print(f"[DEBUG] pslist first few rows:\n{df.head()}")
             
@@ -56,10 +48,8 @@ def extract_pslist_features(jsondump):
         }
     
     try:
-        # Number of processes
         if 'PPID' in df.columns:
             features['pslist.nproc'] = len(df)
-            # print(f"[DEBUG] pslist.nproc = {len(df)}")
         else:
             print("[WARN] pslist: PPID column not found, using row count")
             features['pslist.nproc'] = len(df)
@@ -69,7 +59,6 @@ def extract_pslist_features(jsondump):
         features['pslist.nproc'] = 0
         
     try:
-        # Number of unique parent process IDs
         if 'PPID' in df.columns:
             features['pslist.nppid'] = df['PPID'].nunique()
         else:
@@ -80,17 +69,7 @@ def extract_pslist_features(jsondump):
         features['pslist.nppid'] = 0
         
     try:
-        # Average number of threads
         if 'Threads' in df.columns:
-            # print("printing df.Threads...")
-            # print(df['Threads'])
-
-            # print("[DEBUG] Threads column types:")
-            # print(df['Threads'].apply(lambda x: type(x)).value_counts())
-            # print("[DEBUG] Threads column sample:")
-            # print(df['Threads'].head())
-
-            # features['pslist.avg_threads'] = float(df['Threads'].mean())
             df['Threads'] = pd.to_numeric(df['Threads'], errors='coerce')
             features['pslist.avg_threads'] = float(df['Threads'].mean())
 
@@ -102,20 +81,18 @@ def extract_pslist_features(jsondump):
         features['pslist.avg_threads'] = 0
         
     try:
-        # Number of 64-bit processes (check different possible column names and values)
         nprocs64bit = 0
         if 'Wow64' in df.columns:
-            # Wow64 True means 32-bit process on 64-bit system, so False means 64-bit
             wow64_col = df['Wow64']
-            if wow64_col.dtype == 'object':  # String column
+            if wow64_col.dtype == 'object':
                 nprocs64bit = len(df[df['Wow64'].astype(str).str.lower() == 'false'])
-            else:  # Boolean column
+            else:
                 nprocs64bit = len(df[df['Wow64'] == False])
-        elif 'IsWow64' in df.columns:  # Alternative column name
+        elif 'IsWow64' in df.columns:
             iswow64_col = df['IsWow64']
-            if iswow64_col.dtype == 'object':  # String column
+            if iswow64_col.dtype == 'object':
                 nprocs64bit = len(df[df['IsWow64'].astype(str).str.lower() == 'false'])
-            else:  # Boolean column
+            else:
                 nprocs64bit = len(df[df['IsWow64'] == False])
         else:
             print("[WARN] pslist: Neither Wow64 nor IsWow64 column found")
@@ -132,23 +109,14 @@ def extract_pslist_features(jsondump):
 def extract_dlllist_features(jsondump):
     df = pd.DataFrame(jsondump)
     try:
-        a = df.PID.size                                           #Total Number of all loaded libraries
-        # b = df.PID.unique().size                              #Number of Processes loading dlls
-        c = df.PID.size/df.PID.unique().size             #Average loaded libraries per process
-        # d = df.Size.sum()/df.PID.unique().size                  #Average Size of loaded libraries
-        # e = df.PID.size - len(df[df["File output"]=="Disabled"]) #Number of loaded librearies outputting files
+        a = df.PID.size
+        b = df.PID.size/df.PID.unique().size
     except:
         a = None
-        # b = None
-        c = None
-        # d = None
-        # e = None
+        b = None
     return{
         'dlllist.ndlls': a,
-        # 'dlllist.nproc_dll': b,#Not part of our dataset
-        'dlllist.avg_dlls_per_proc': c,
-        # 'dlllist.avgSize': d,#Not part of our dataset
-        # 'dlllist.outfile': e#Not part of our dataset
+        'dlllist.avg_dlls_per_proc': b
     }
 
 
@@ -213,8 +181,6 @@ def extract_handles_features(jsondump):
 def extract_ldrmodules_features(jsondump):
     try:
         df = pd.DataFrame(jsondump)
-        # print(f"[DEBUG] ldrmodules DataFrame shape: {df.shape}")
-        # print(f"[DEBUG] ldrmodules columns: {df.columns.tolist()}")
         if not df.empty:
             print(f"[DEBUG] ldrmodules first few rows:\n{df.head()}")
     except Exception as e:
@@ -235,16 +201,12 @@ def extract_ldrmodules_features(jsondump):
         }
     
     try:
-        # Check what the actual column names are and handle boolean values properly
         total_modules = len(df)
-        
-        # Handle InLoad column
         if 'InLoad' in df.columns:
-            # Convert string 'False'/'True' to boolean if needed
             inload_col = df['InLoad']
-            if inload_col.dtype == 'object':  # String column
+            if inload_col.dtype == 'object':
                 not_in_load = len(df[df['InLoad'].astype(str).str.lower() == 'false'])
-            else:  # Already boolean
+            else:
                 not_in_load = len(df[df['InLoad'] == False])
             features['ldrmodules.not_in_load'] = not_in_load
             features['ldrmodules.not_in_load_avg'] = not_in_load / total_modules if total_modules > 0 else 0
@@ -252,13 +214,12 @@ def extract_ldrmodules_features(jsondump):
             print("[WARN] ldrmodules: InLoad column not found")
             features['ldrmodules.not_in_load'] = 0
             features['ldrmodules.not_in_load_avg'] = 0
-            
-        # Handle InInit column
+
         if 'InInit' in df.columns:
             inint_col = df['InInit']
-            if inint_col.dtype == 'object':  # String column
+            if inint_col.dtype == 'object':
                 not_in_init = len(df[df['InInit'].astype(str).str.lower() == 'false'])
-            else:  # Already boolean
+            else:
                 not_in_init = len(df[df['InInit'] == False])
             features['ldrmodules.not_in_init'] = not_in_init
             features['ldrmodules.not_in_init_avg'] = not_in_init / total_modules if total_modules > 0 else 0
@@ -267,12 +228,11 @@ def extract_ldrmodules_features(jsondump):
             features['ldrmodules.not_in_init'] = 0
             features['ldrmodules.not_in_init_avg'] = 0
             
-        # Handle InMem column
         if 'InMem' in df.columns:
             inmem_col = df['InMem']
-            if inmem_col.dtype == 'object':  # String column
+            if inmem_col.dtype == 'object':
                 not_in_mem = len(df[df['InMem'].astype(str).str.lower() == 'false'])
-            else:  # Already boolean
+            else:
                 not_in_mem = len(df[df['InMem'] == False])
             features['ldrmodules.not_in_mem'] = not_in_mem
             features['ldrmodules.not_in_mem_avg'] = not_in_mem / total_modules if total_modules > 0 else 0
@@ -296,53 +256,31 @@ def extract_ldrmodules_features(jsondump):
 
 def extract_malfind_features(jsondump):
     df = pd.DataFrame(jsondump)
-    # print("[DEBUG]: printing dataframe's CommitCharge: ")
-    # print(df.CommitCharge)
     df['CommitCharge'] = pd.to_numeric(df['CommitCharge'], errors='coerce')
-    # print("[DEBUG] CommitCharge summary stats:")
-    # print(df['CommitCharge'].describe())
-    # print("[DEBUG] Top CommitCharge values:")
-    # print(df['CommitCharge'].sort_values(ascending=False).head())
-    # print("[DEBUG] I need to pick one from: ")
-    # print(f"df.CommitCharge.sum() = {df['CommitCharge'].sum()}, df.CommitCharge.mean() = {df['CommitCharge'].mean()}, and df.CommitCharge.max()={df['CommitCharge'].max()}")
-
 
     return {                                                                        
-        'malfind.ninjections': df['CommitCharge'].size,                              #Number of hidden code injections found by malfind
-        # 'malfind.commitCharge': df.CommitCharge.sum(),                            #Sum of Commit Charges over time                                
-        'malfind.commitCharge': df['CommitCharge'].sum(),                            #Sum of Commit Charges over time  
-        'malfind.protection': len(df[df["Protection"]=="PAGE_EXECUTE_READWRITE"]),#Number of injections with all permissions 
-        'malfind.uniqueInjections': df.PID.unique().size,                         #Number of unique injections
-        # 'malfind.avgInjec_per_proc': df.PID.size/df.PID.unique().size,            #Average number of injections per process
-        # 'malfind.tagsVad': len(df[df["Tag"]=="Vad"]),                             #Number of Injections tagged as Vad
-        # 'malfind.tagsVads': len(df[df["Tag"]=="Vads"]),                           #Number of Injections tagged as Vads
-        # 'malfind.aveVPN_diff': df['End VPN'].sub(df['Start VPN']).sum()           #Avg VPN size of injections
+        'malfind.ninjections': df['CommitCharge'].size,
+        'malfind.commitCharge': df['CommitCharge'].sum(),
+        'malfind.protection': len(df[df["Protection"]=="PAGE_EXECUTE_READWRITE"]),
+        'malfind.uniqueInjections': df.PID.unique().size,
     }
 
 def extract_modules_features(jsondump):
     df = pd.DataFrame(jsondump)
     return {
-        'modules.nmodules': df.Base.size,                                          #Number of Modules
-        # 'modules.avgSize': df.Size.mean(),                             #Average size of the modules
-        # 'modules.FO_enabled': df.Base.size - len(df[df["File output"]=='Disabled'])#Number of Output enabled File Output
+        'modules.nmodules': df.Base.size
     }
 def extract_callbacks_features(jsondump):
     df = pd.DataFrame(jsondump)
     features = {}
-
-    # Total callbacks
     try:
         features['callbacks.ncallbacks'] = len(df)
     except Exception as e:
         print(f"[WARN] Failed to compute callbacks.ncallbacks: {e}")
-
-    # Anonymous callbacks
     try:
         features['callbacks.nanonymous'] = (df['Module'] == 'UNKNOWN').sum()
     except Exception as e:
         print(f"[WARN] Failed to compute callbacks.nanonymous: {e}")
-
-    # Generic callbacks
     try:
         features['callbacks.ngeneric'] = (df['Type'] == 'GenericKernelCallback').sum()
     except Exception as e:
@@ -396,49 +334,17 @@ def extract_svcscan_features(jsondata):
 
     return features
 
-# def extract_psxview_features(jsondump):
-#     psxview = json.load(jsondump)
 
-#     # Auto-diagnostic for missing expected keys
-#     expected_keys = ['pslist', 'psscan', 'csrss', 'pspcid', 'session', 'deskthrd', 'thrdproc']
-#     for k in expected_keys:
-#         missing = [p for p in psxview if k not in p or p[k] is None]
-#         if missing:
-#             print(f"[INFO] Missing key: {k} in {len(missing)} / {len(psxview)} entries")
-
-#     def count_false(key):
-#         return sum(1 for p in psxview if str(p.get(key, True)) == 'False')
-
-#     total = len(psxview) if psxview else 1  # prevent division by zero
-
-#     return {
-#         'psxview.not_in_pslist': count_false('pslist'),
-#         'psxview.not_in_eprocess_pool': count_false('psscan'),
-#         'psxview.not_in_ethread_pool': count_false('thrdproc'),
-#         'psxview.not_in_pspcid_list': count_false('pspcid'),
-#         'psxview.not_in_csrss_handles': count_false('csrss'),
-#         'psxview.not_in_session': count_false('session'),
-#         'psxview.not_in_deskthrd': count_false('deskthrd'),
-
-#         'psxview.not_in_pslist_false_avg': count_false('pslist') / total,
-#         'psxview.not_in_eprocess_pool_false_avg': count_false('psscan') / total,
-#         'psxview.not_in_ethread_pool_false_avg': count_false('thrdproc') / total,
-#         'psxview.not_in_pspcid_list_false_avg': count_false('pspcid') / total,
-#         'psxview.not_in_csrss_handles_false_avg': count_false('csrss') / total,
-#         'psxview.not_in_session_false_avg': count_false('session') / total,
-#         'psxview.not_in_deskthrd_false_avg': count_false('deskthrd') / total,
-#     }
 def get_available_psxview_features(psxview):
     keys_present = set()
     for entry in psxview:
         keys_present.update(entry.keys())
-    # Remove non-boolean columns if necessary (like PID or name)
-    keys_present.discard('PID')  # or 'pid', 'offset', etc., depending on your data
+    
+    keys_present.discard('PID')
     return sorted(keys_present)
 
 def extract_psxview_features(psxview):
-    #print(get_available_psxview_features(psxview=psxview))
-    total = len(psxview) if psxview else 1  # prevent division by zero
+    total = len(psxview) if psxview else 1
 
     def count_false(key):
         return sum(1 for p in psxview if str(p.get(key, True)) == 'False')
@@ -469,22 +375,19 @@ VOL_MODULES = {
 }
 
 def invoke_volatility3(memdump_path, full_module_name):    
-    # Create a proper FileHandler class that implements all required methods
     class LocalFileHandler(interfaces.plugins.FileHandlerInterface):
         """File handler for local files"""
         
         def open(self, request):
             """Open a file based on the request"""
             if isinstance(request, str):
-                # Handle file:// URLs
                 if request.startswith('file://'):
                     file_path = urllib.parse.urlparse(request).path
-                    # On Windows, remove the leading slash from paths like /C:/path
                     if file_path.startswith('/') and len(file_path) > 1 and file_path[2] == ':':
                         file_path = file_path[1:]
                     return open(file_path, 'rb')
                 elif request.startswith('file:'):
-                    file_path = request[5:]  # Remove 'file:' prefix
+                    file_path = request[5:]
                     return open(file_path, 'rb')
                 else:
                     return open(request, 'rb')
@@ -495,34 +398,29 @@ def invoke_volatility3(memdump_path, full_module_name):
             if file_handle and hasattr(file_handle, 'close'):
                 file_handle.close()
 
-    # Split full module name
     module_name, plugin_class_name = full_module_name.split(".")
 
     plugin_path = f"windows.{full_module_name}"
     ctx = contexts.Context()
     base_config_path = "plugins"
 
-    # Get available automagics
     automagics_list = automagic.available(ctx)
 
-    # Load plugin class - using vol_plugins instead of framework
     plugin_list = framework.list_plugins()
     plugin_class = plugin_list.get(plugin_path)
     if plugin_class is None:
         raise ValueError(f"Plugin {plugin_path} not found")
 
-    # Set memory layer + location
     ctx.config[base_config_path + "." + plugin_class.__name__ + ".primary"] = "memory_layer"
     ctx.config["automagic.LayerStacker.single_location"] = f"file:{memdump_path}"
 
-    # Run automagics to build memory layer
     try:
         constructed = plugins.construct_plugin(
             ctx,
             automagics_list,
             plugin_class,
             base_config_path,
-            open_method=LocalFileHandler,  # Pass the class, not an instance
+            open_method=LocalFileHandler,
             progress_callback=None
         )
     except exceptions.UnsatisfiedException as e:
@@ -531,16 +429,12 @@ def invoke_volatility3(memdump_path, full_module_name):
             print(f" - {req}")
         raise
 
-    # Run plugin
     renderable = constructed.run()
 
-    # Convert TreeGrid to list of dicts
     columns = renderable.columns
     output_data = []
     
-    # Use the visitor pattern to iterate through TreeGrid
     def visitor(node, accumulator):
-        # Get the row data from the node
         row_data = {}
         for i, col in enumerate(columns):
             try:
@@ -551,9 +445,7 @@ def invoke_volatility3(memdump_path, full_module_name):
         accumulator.append(row_data)
         return accumulator
     
-    # Apply visitor to all nodes in the TreeGrid
     renderable.visit(node=None, function=visitor, initial_accumulator=output_data)
-    # print(plugin_list)
     return output_data
 
 
@@ -568,8 +460,6 @@ def write_dict_to_csv(filename, dictionary):
             writer.writeheader()
         writer.writerow(dictionary)
 
-
-#def extract_all_features_from_memdump(memdump_path, output_path):
 def extract_all_features_from_memdump(memdump_path, output_path, progress_callback=None):
     features = {}
     print(f'=> Extracting features from {memdump_path}')
