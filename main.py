@@ -1,13 +1,27 @@
-from PyQt6.QtWidgets import QApplication
 import sys
+from PyQt6.QtWidgets import QApplication
 from view.main_window import MainWindow
-from controller.csv_uploader_controller import CSVUploaderController
 
-if __name__ == '__main__':
+
+if __name__ == "__main__":
+    print("main.py launched with args:", sys.argv)
+
     app = QApplication(sys.argv)
     window = MainWindow()
-    window.load_stylesheet("view/style.qss")
-    controller = CSVUploaderController(window.csv_uploader_view)
-    window.show()
-    sys.exit(app.exec())
     
+    from controller.dev_mode_controller import devModeController
+    dev_controller = devModeController(window.dev_mode_view)
+
+    # ✅ Switch to User Mode if flag is present
+    if "--user-mode" in sys.argv:
+        window.nav_list.setCurrentRow(1)  # User Mode index
+        window.stack.setCurrentIndex(1)
+
+    window.show()
+
+    if "--create-dump" in sys.argv:
+        from controller.user_mode_controller import UserModeController
+        controller = UserModeController(window.user_mode_view)
+        controller.handle_create_dump()
+
+    sys.exit(app.exec())

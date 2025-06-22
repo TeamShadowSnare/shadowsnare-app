@@ -3,7 +3,7 @@ from PyQt6.QtCore import QDate, QTime, Qt
 from utils.template_loader import load_template
 
 class SummaryService:
-    def generate_summary(self, total_count, benign_count, malicious_count, status):
+    def generate_summary(self, total_count, benign_count, malicious_count, status, explanation_link=""):
       
         template_path = os.path.join("templates", "scan_summary_template.html")
         template = load_template(template_path)
@@ -14,5 +14,6 @@ class SummaryService:
             malicious_count=malicious_count,
             status=status,
             date_str=QDate.currentDate().toString(Qt.DateFormat.ISODate),
-            time_str=QTime.currentTime().toString(Qt.DateFormat.ISODate)
+            time_str=QTime.currentTime().toString(Qt.DateFormat.ISODate),
+            explanation_link=explanation_link
         )
