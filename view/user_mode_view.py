@@ -24,7 +24,7 @@ class UserMode(QWidget):
     <div style='text-align:center; color:white;'>
         <h2 style='font-size:26px; color:#6dd5fa; margin-bottom:30px;'>How to Use:</h2>
         <p style="font-size:20px; color:white; line-height:2;">
-           1. <strong>Create a memory-dump file (.raw/.vmem).</strong><br>
+           1. <strong>Create a memory-dump file (.raw/.vmem) — requires Administrator privileges.</strong><br>
            2. <strong>Extract features to a CSV file.</strong><br>
            3. <strong>Run analysis to detect malware.</strong>
         </p>

@@ -12,7 +12,7 @@ from utils.default_path import get_default, set_default
 
 import ctypes
 import sys
-from utils.run_as_admin import run_as_admin
+#from utils.run_as_admin import run_as_admin
 from model.malware_model import MalwareDetector
 
 class UserModeController:
@@ -49,14 +49,21 @@ class UserModeController:
             self.view.show_result(f"❌ WinPmem not found at: {winpmem_path}")
             return
 
-        if not ctypes.windll.shell32.IsUserAnAdmin():
-            self.view.show_result("🔒 Requesting admin permissions...")
+        # if not ctypes.windll.shell32.IsUserAnAdmin():
+        #     self.view.show_result("🔒 Requesting admin permissions...")
 
-            if run_as_admin("--create-dump", "--user-mode"):
-                sys.exit()
-            else:
-                self.view.show_result("❌ Admin elevation failed or cancelled.")
-                return
+        #     if run_as_admin("--create-dump", "--user-mode"):
+        #         sys.exit()
+        #     else:
+        #         self.view.show_result("❌ Admin elevation failed or cancelled.")
+        #         return
+        
+        if not ctypes.windll.shell32.IsUserAnAdmin():
+            self.view.show_result(
+                "❌ Administrator privileges are required to create a memory dump.<br>"
+                "Please close ShadowSnare and run it via <b>Right-click → Run as administrator</b>."
+            )
+            return
 
         self.view.show_result("🧠 Creating memory dump... please wait...")
 
