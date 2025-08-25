@@ -1,3 +1,11 @@
+"""
+Volatility3-based feature extraction utilities.
+
+Provides per-plugin extractors that turn raw plugin JSON/rows into a flat
+feature dictionary, a runner that invokes Volatility3 plugins on a memory dump,
+and a pipeline that aggregates all features and writes them to CSV.
+"""
+
 import argparse
 import csv
 import os
@@ -27,6 +35,18 @@ from volatility3.plugins.windows import pslist, dlllist, handles, ldrmodules, ma
 
 
 def extract_pslist_features(jsondump):
+    """Compute pslist-derived features from plugin output.
+
+    Parameters
+    ----------
+    jsondump : list[dict]
+        Rows produced by the Volatility3 `pslist` plugin.
+
+    Returns
+    -------
+    dict
+        Keys: pslist.nproc, pslist.nppid, pslist.avg_threads, pslist.nprocs64bit.
+    """
     try:
         df = pd.DataFrame(jsondump)
         if not df.empty:
@@ -107,6 +127,18 @@ def extract_pslist_features(jsondump):
 
 
 def extract_dlllist_features(jsondump):
+    """Compute dlllist-derived features.
+
+    Parameters
+    ----------
+    jsondump : list[dict]
+        Rows from Volatility3 `dlllist`.
+
+    Returns
+    -------
+    dict
+        dlllist.ndlls, dlllist.avg_dlls_per_proc.
+    """
     df = pd.DataFrame(jsondump)
     try:
         a = df.PID.size
@@ -121,6 +153,18 @@ def extract_dlllist_features(jsondump):
 
 
 def extract_handles_features(jsondump):
+    """Compute handle-related features including per-type counts.
+
+    Parameters
+    ----------
+    jsondump : list[dict]
+        Rows from Volatility3 `handles`.
+
+    Returns
+    -------
+    dict
+        Various `handles.*` counts and `pslist.avg_handlers`.
+    """
     features = {}
 
     try:
@@ -176,9 +220,19 @@ def extract_handles_features(jsondump):
 
 
 
-
-
 def extract_ldrmodules_features(jsondump):
+    """Compute features from ldrmodules plugin output.
+
+    Parameters
+    ----------
+    jsondump : list[dict]
+        Rows from Volatility3 `ldrmodules`.
+
+    Returns
+    -------
+    dict
+        Counts and ratios for modules not in {Load, Init, Mem}.
+    """
     try:
         df = pd.DataFrame(jsondump)
         if not df.empty:
@@ -255,6 +309,18 @@ def extract_ldrmodules_features(jsondump):
     return features
 
 def extract_malfind_features(jsondump):
+    """Compute malfind-derived features (injections, protections, charge, unique PIDs).
+
+    Parameters
+    ----------
+    jsondump : list[dict]
+        Rows from Volatility3 `malfind`.
+
+    Returns
+    -------
+    dict
+        malfind.ninjections, malfind.commitCharge, malfind.protection, malfind.uniqueInjections.
+    """
     df = pd.DataFrame(jsondump)
     df['CommitCharge'] = pd.to_numeric(df['CommitCharge'], errors='coerce')
 
@@ -266,11 +332,36 @@ def extract_malfind_features(jsondump):
     }
 
 def extract_modules_features(jsondump):
+    """Compute simple module count from `modules` plugin output.
+
+    Parameters
+    ----------
+    jsondump : list[dict]
+        Rows from Volatility3 `modules`.
+
+    Returns
+    -------
+    dict
+        modules.nmodules count.
+    """
     df = pd.DataFrame(jsondump)
     return {
         'modules.nmodules': df.Base.size
     }
+
 def extract_callbacks_features(jsondump):
+    """Compute callbacks plugin features (counts, anonymous, generic types).
+
+    Parameters
+    ----------
+    jsondump : list[dict]
+        Rows from Volatility3 `callbacks`.
+
+    Returns
+    -------
+    dict
+        callbacks.ncallbacks, callbacks.nanonymous, callbacks.ngeneric.
+    """
     df = pd.DataFrame(jsondump)
     features = {}
     try:
@@ -290,6 +381,18 @@ def extract_callbacks_features(jsondump):
 
 
 def extract_svcscan_features(jsondata):
+    """Compute service scan features (by type/state).
+
+    Parameters
+    ----------
+    jsondata : list[dict]
+        Rows from Volatility3 `svcscan`.
+
+    Returns
+    -------
+    dict
+        Counts for service types and running state.
+    """
     try:
         df = pd.DataFrame(jsondata)
     except Exception as e:
@@ -336,6 +439,18 @@ def extract_svcscan_features(jsondata):
 
 
 def get_available_psxview_features(psxview):
+    """Return the set of available psxview keys (excluding PID), sorted.
+
+    Parameters
+    ----------
+    psxview : list[dict]
+        Rows from Volatility3 `psxview`.
+
+    Returns
+    -------
+    list[str]
+        Sorted list of keys present (without 'PID').
+    """
     keys_present = set()
     for entry in psxview:
         keys_present.update(entry.keys())
@@ -344,6 +459,18 @@ def get_available_psxview_features(psxview):
     return sorted(keys_present)
 
 def extract_psxview_features(psxview):
+    """Compute psxview 'not in X' counts and normalized ratios.
+
+    Parameters
+    ----------
+    psxview : list[dict]
+        Rows from Volatility3 `psxview`.
+
+    Returns
+    -------
+    dict
+        Counts and averages for pslist/psscan/csrss checks.
+    """
     total = len(psxview) if psxview else 1
 
     def count_false(key):
@@ -374,12 +501,33 @@ VOL_MODULES = {
     'psxview.PsXView':extract_psxview_features
 }
 
-def invoke_volatility3(memdump_path, full_module_name):    
+def invoke_volatility3(memdump_path, full_module_name):
+    """Run a specific Volatility3 plugin on a memory dump and return rows.
+
+    Parameters
+    ----------
+    memdump_path : str
+        Path to the memory dump file.
+    full_module_name : str
+        e.g., "pslist.PsList", "dlllist.DllList" (Windows plugins).
+
+    Returns
+    -------
+    list[dict]
+        Rows rendered from the plugin's `renderable`, as string-valued dicts.
+
+    Raises
+    ------
+    ValueError
+        If the requested plugin cannot be found.
+    exceptions.UnsatisfiedException
+        If automagic requirements cannot be satisfied.
+    """
     class LocalFileHandler(interfaces.plugins.FileHandlerInterface):
-        """File handler for local files"""
+        """Minimal file handler for accessing local files with file:// support."""
         
         def open(self, request):
-            """Open a file based on the request"""
+            """Open and return a readable file handle for the given request string/path."""
             if isinstance(request, str):
                 if request.startswith('file://'):
                     file_path = urllib.parse.urlparse(request).path
@@ -394,7 +542,7 @@ def invoke_volatility3(memdump_path, full_module_name):
             return open(request, 'rb')
             
         def close(self, file_handle):
-            """Close a file handle"""
+            """Close a file handle if it supports `close()`."""
             if file_handle and hasattr(file_handle, 'close'):
                 file_handle.close()
 
@@ -435,6 +583,7 @@ def invoke_volatility3(memdump_path, full_module_name):
     output_data = []
     
     def visitor(node, accumulator):
+        """Visitor callback used by renderable.visit to collect rows into dicts."""
         row_data = {}
         for i, col in enumerate(columns):
             try:
@@ -451,6 +600,15 @@ def invoke_volatility3(memdump_path, full_module_name):
 
 
 def write_dict_to_csv(filename, dictionary):
+    """Append a single row (dictionary) to a CSV file, writing a header if needed.
+
+    Parameters
+    ----------
+    filename : str
+        Path to the CSV to write/append.
+    dictionary : dict
+        Row data; keys become fieldnames.
+    """
     fieldnames = list(dictionary.keys())
     file_exists = os.path.isfile(filename)
 
@@ -461,11 +619,28 @@ def write_dict_to_csv(filename, dictionary):
         writer.writerow(dictionary)
 
 def extract_all_features_from_memdump(memdump_path, output_path, progress_callback=None):
+    """Run all configured Volatility3 plugins and write features to output.csv.
+
+    Parameters
+    ----------
+    memdump_path : str
+        Path to the memory dump file.
+    output_path : str
+        Directory where `output.csv` will be created/updated.
+    progress_callback : callable | Qt signal, optional
+        Receives textual progress messages.
+
+    Returns
+    -------
+    str
+        Path to the generated CSV file (output.csv).
+    """
     features = {}
     print(f'=> Extracting features from {memdump_path}')
     print(f'=> Outputting to {output_path}')
 
     def emit_progress(message):
+        """Emit progress messages via callback or direct call."""
         if progress_callback:
             if hasattr(progress_callback, "emit"):
                 progress_callback.emit(message)
@@ -493,6 +668,7 @@ def extract_all_features_from_memdump(memdump_path, output_path, progress_callba
 
 
 def parse_args():
+    """Parse CLI arguments for single-dump extraction (memdump path and output dir)."""
     parser = argparse.ArgumentParser()
     parser.add_argument(
         "-f", "--memdump", required=True, help="Path to a single memory dump file (.raw/.vmem/.mem)"

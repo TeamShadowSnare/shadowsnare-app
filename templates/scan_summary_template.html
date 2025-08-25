@@ -1,17 +1,36 @@
+<!--
+Scan Summary Template (templates/scan_summary_template.html)
+Used by: SummaryService.generate_summary(...)
+
+Placeholders (Python .format keys):
+  {total_count}       -> number of dump files analyzed
+  {benign_count}      -> count predicted as Benign
+  {malicious_count}   -> count predicted as Malware
+  {status}            -> high-level status string (e.g., "Device Clean" / "Potential Malware Detected")
+  {explanation_link}  -> optional HTML link (e.g., "🔍 View explanation") injected by the controller
+  {date_str}          -> ISO date (e.g., 2025-08-25)
+  {time_str}          -> ISO time (e.g., 13:47:05)
+-->
+
 <div style='text-align: center; font-size: 22px; font-weight: bold; margin-bottom: 20px;'>Scan Results Summary:</div>
 
+<!-- Main stats block: counts + device status -->
 <div style='line-height: 1.8; font-size: 18px; margin-bottom: 45px;'>
     - Total Memory Dump Files Scanned: {total_count}<br>
     - Benign Dump Files: {benign_count}<br>
+    <!-- Malicious count highlighted in red for quick attention -->
     - Malicious Dump Files: <span style='color: red;'>{malicious_count}</span><br><br><br><br>
 
     <span style='font-size: 22px;'>Device Status: </span>
+    <!-- Status in red; you may swap to green in code when status indicates "clean" -->
     <span style='color: red;'>{status}</span> ({malicious_count} out of {total_count} dump files flagged as malicious).
     <br>
+    <!-- Optional: clickable anchor that the view handles (e.g., opens SHAP popup) -->
     {explanation_link} 
 </div>
 
 <br><br><br>
+<!-- Footer: right-aligned timestamp -->
 <div style='position: absolute; right: 10px; font-size: 16px; text-align: right; margin-bottom: 1px;'>
     Scan Date: {date_str} {time_str}
 </div>

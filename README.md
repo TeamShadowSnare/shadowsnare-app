@@ -36,7 +36,7 @@
 
 ```bash
 # 1. Clone the repository
-git clone https://github.com/yourusername/ShadowSnare.git
+git clone https://github.com/TeamShadowSnare/ShadowSnare-app.git
 cd ShadowSnare
 
 # 2. Install required packages
@@ -66,7 +66,7 @@ python main.py
 
 ### 👥 Team
 
-- **Rani Izsack** – Project Lead  
+- **Rani Izsack** – Project Supervisor  
 - **Amos Zohar** – Data Acquisition, Feature Extraction, UI Development  
 - **Gal Havshush** – Machine Learning Specialist, UI Development  
 - **Ortal Nissim** – Machine Learning Specialist, UI Development  
@@ -76,6 +76,5 @@ python main.py
 ### 🙏 Acknowledgements
 
 - [CIC-MalMem-2022 Dataset](https://www.unb.ca/cic/datasets/malmem-2022.html)  
-- [OpenAI](https://openai.com) – Technical ideation and architecture assistance  
 - [WinPmem](https://github.com/Velocidex/WinPmem) – Memory acquisition tool used in the dump creation process  
 - [Volatility](https://www.volatilityfoundation.org/) – Framework used for memory dump analysis and feature extraction
